@@ -36,3 +36,22 @@ Thumbs.db
 
 # Private data
 sihi/data/
+
+# Build output (compiled JS từ TypeScript)
+ws-server/dist/
+stt-service/__pycache__/
+stt-service/*.pyc
+
+# Lock files trong subfolder (không cần track)
+ws-server/package-lock.json
+sihi/package-lock.json
+
+# Next.js trong sihi
+sihi/.next/
+sihi/node_modules/
+sihi/out/
+sihi/build/
+
+# TypeScript build info
+*.tsbuildinfo
+sihi/next-env.d.ts
