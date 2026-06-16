@@ -53,19 +53,19 @@ function calcStreak(interviews: Interview[]): number {
   return streak;
 }
 
-// ─── Mock recruitment news (cập nhật định kỳ) ───────────────────
-const RECRUITMENT_NEWS = [
-  { id: 1, company: "FPT Software", logo: "🏢", role: "Senior Frontend Developer", tags: ["React", "TypeScript"], location: "Hà Nội", date: "2 giờ trước", url: "https://fpt-software.com", hot: true },
-  { id: 2, company: "VNG Corporation", logo: "🎮", role: "Backend Engineer (Go/Java)", tags: ["Go", "Java", "Kafka"], location: "TP.HCM", date: "5 giờ trước", url: "https://vng.com.vn", hot: true },
-  { id: 3, company: "Zalo (VNG)", logo: "💬", role: "Mobile Developer (iOS/Android)", tags: ["Swift", "Kotlin"], location: "TP.HCM", date: "8 giờ trước", url: "https://zalo.me", hot: false },
-  { id: 4, company: "Tiki", logo: "🛒", role: "Data Engineer", tags: ["Python", "Spark", "Airflow"], location: "TP.HCM", date: "1 ngày trước", url: "https://tiki.vn", hot: false },
-  { id: 5, company: "Shopee Vietnam", logo: "🛍️", role: "Full Stack Developer", tags: ["Node.js", "React", "AWS"], location: "TP.HCM", date: "1 ngày trước", url: "https://shopee.vn", hot: true },
-  { id: 6, company: "Viettel Digital", logo: "📡", role: "AI/ML Engineer", tags: ["Python", "TensorFlow", "MLOps"], location: "Hà Nội", date: "2 ngày trước", url: "https://viettel.com.vn", hot: false },
-];
-
 // ─── Types ──────────────────────────────────────────────────────
 interface Interview { id: string; field: string; level: string; status: string; totalScore: number | null; createdAt: string; }
 interface ProgressSnapshot { overallScore: number; readinessLevel: string; suggestion: string; totalInterviews: number; }
+interface NewsItem {
+  id: string; title: string; source: string; date: string; dateLabel: string;
+  url: string; image: string | null; company: "FPT" | "Viettel" | "VNG";
+}
+
+const COMPANY_COLOR: Record<string, string> = {
+  FPT: "bg-orange-500/20 text-orange-300",
+  Viettel: "bg-red-500/20 text-red-300",
+  VNG: "bg-blue-500/20 text-blue-300",
+};
 
 // ─── Stat tile ──────────────────────────────────────────────────
 function StatTile({ icon: Icon, label, value, sub, iconColor, delay }: {
@@ -99,22 +99,36 @@ export default function DashboardPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+
   useEffect(() => {
     Promise.all([
-      fetch("/api/interviews?limit=30").then((r) => r.json()),  // nhiều hơn để tính streak
+      fetch("/api/interviews?limit=30").then((r) => r.json()),
       fetch("/api/analytics/progress").then((r) => r.json()),
     ]).then(([intData, progData]) => {
       const all: Interview[] = intData.interviews || [];
       setAllInterviews(all);
-      setInterviews(all.slice(0, 5));   // chỉ hiển thị 5 gần nhất
+      setInterviews(all.slice(0, 5));
       setTotal(intData.total ?? all.length);
       setProgress(progData.latest || null);
       setLoading(false);
     }).catch(() => setLoading(false));
+
+    // Fetch real recruitment news
+    fetch("/api/news/recruitment")
+      .then((r) => r.json())
+      .then((data) => { setNews(data.items || []); setNewsLoading(false); })
+      .catch(() => setNewsLoading(false));
   }, []);
 
   const streak = calcStreak(allInterviews);
-  const avgScore = progress?.overallScore ?? null;
+  // Ưu tiên dùng analytics API, fallback tính thẳng từ interviews
+  const scoredInterviews = allInterviews.filter((iv) => iv.totalScore !== null && iv.totalScore > 0);
+  const directAvg = scoredInterviews.length
+    ? Math.round(scoredInterviews.reduce((s, iv) => s + (iv.totalScore ?? 0), 0) / scoredInterviews.length)
+    : null;
+  const avgScore = progress?.overallScore ?? directAvg;
   const readiness = progress ? READINESS_LABELS[progress.readinessLevel] : null;
   const firstName = session?.user?.name?.split(" ").pop() || "bạn";
 
@@ -164,7 +178,11 @@ export default function DashboardPage() {
               icon={BarChart3}
               label="Điểm trung bình"
               value={avgScore != null ? `${avgScore}đ` : "—"}
-              sub={readiness ? readiness.label : "Chưa có dữ liệu"}
+              sub={
+                readiness ? readiness.label
+                : avgScore != null ? (avgScore >= 80 ? "Xuất sắc" : avgScore >= 65 ? "Khá" : avgScore >= 50 ? "Cần ôn luyện" : "Chưa sẵn sàng")
+                : "Chưa có dữ liệu"
+              }
               iconColor="bg-gradient-to-br from-fuchsia-500 to-pink-600"
               delay={0.2}
             />
@@ -206,7 +224,18 @@ export default function DashboardPage() {
                   <p className="text-sm text-zinc-400">{translateSuggestion(progress.suggestion)}</p>
                 </div>
               ) : (
-                <p className="text-sm text-zinc-500">Chưa có dữ liệu. Hãy bắt đầu phỏng vấn đầu tiên!</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-5xl font-bold gradient-text">0</span>
+                    <Badge className="text-sm px-3 py-1 bg-zinc-700/50 text-zinc-400">Chưa có dữ liệu</Badge>
+                  </div>
+                  <Progress value={0} className="h-2" />
+                  <p className="text-xs text-zinc-600">
+                    {allInterviews.length === 0
+                      ? "Hoàn thành phỏng vấn đầu tiên để xem đánh giá"
+                      : "Hệ thống AI sẽ tổng hợp đánh giá sau khi phỏng vấn được chấm điểm"}
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -268,58 +297,92 @@ export default function DashboardPage() {
           <h2 className="text-base font-semibold flex items-center gap-2">
             <span className="text-lg">🔥</span> Tin tuyển dụng nổi bật
           </h2>
-          <span className="text-xs text-zinc-500">Từ các tập đoàn hàng đầu Việt Nam</span>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {RECRUITMENT_NEWS.map((news, i) => (
-            <motion.a
-              key={news.id}
-              href={news.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.65 + i * 0.05 }}
-              className="group block"
-            >
-              <Card className="glass border-0 hover:border-violet-500/30 border border-transparent transition-all duration-200 hover:shadow-lg hover:shadow-violet-500/5 cursor-pointer">
-                <CardContent className="p-4 space-y-2.5">
-                  {/* Company + HOT badge */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{news.logo}</span>
-                      <span className="text-xs font-semibold text-zinc-300">{news.company}</span>
-                    </div>
-                    {news.hot && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">HOT</span>
-                    )}
-                  </div>
-
-                  {/* Role */}
-                  <p className="text-sm font-semibold text-white group-hover:text-violet-300 transition-colors leading-snug">
-                    {news.role}
-                  </p>
-
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1">
-                    {news.tags.map((tag) => (
-                      <span key={tag} className="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-0.5">
-                    <span className="text-xs text-zinc-500">📍 {news.location}</span>
-                    <span className="text-xs text-zinc-600">{news.date}</span>
+        {newsLoading ? (
+          /* Skeleton horizontal */
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="glass border-0 overflow-hidden">
+                <CardContent className="p-0 flex">
+                  <Skeleton className="w-28 h-24 shrink-0 rounded-none" />
+                  <div className="flex-1 p-3 space-y-2">
+                    <Skeleton className="h-3 w-12" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-20 mt-auto" />
                   </div>
                 </CardContent>
               </Card>
-            </motion.a>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : news.length === 0 ? (
+          <Card className="glass border-0">
+            <CardContent className="p-6 text-center text-sm text-zinc-500">
+              Không thể tải tin tức. Vui lòng thử lại sau.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {news.map((item, i) => (
+              <motion.a
+                key={`news-${i}-${item.id}`}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.65 + i * 0.04 }}
+                className="group block"
+              >
+                <Card className="glass border-0 border border-transparent hover:border-violet-500/30 transition-all duration-200 overflow-hidden">
+                  <CardContent className="p-0 flex h-full min-h-[96px]">
+
+                    {/* ── Thumbnail (left) ── */}
+                    <div className="relative w-28 shrink-0 overflow-hidden bg-zinc-800">
+                      {item.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        /* Gradient fallback per company */
+                        <div className={`w-full h-full flex items-center justify-center text-2xl font-black opacity-60 ${
+                          item.company === "FPT" ? "bg-gradient-to-br from-orange-600 to-red-700" :
+                          item.company === "Viettel" ? "bg-gradient-to-br from-red-700 to-rose-900" :
+                          "bg-gradient-to-br from-blue-700 to-indigo-900"
+                        }`}>
+                          <span className="text-white/80 text-xs font-bold tracking-widest">{item.company}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Content (right) ── */}
+                    <div className="flex-1 px-3 py-2.5 flex flex-col gap-1 min-w-0">
+                      {/* Company badge */}
+                      <span className={`text-[10px] font-bold w-fit px-1.5 py-0.5 rounded ${COMPANY_COLOR[item.company] ?? "bg-zinc-700 text-zinc-300"}`}>
+                        {item.company}
+                      </span>
+                      {/* Title */}
+                      <p className="text-[13px] font-semibold text-white group-hover:text-violet-300 transition-colors line-clamp-2 leading-snug">
+                        {item.title}
+                      </p>
+                      {/* Footer */}
+                      <div className="mt-auto flex items-center justify-between">
+                        <span className="text-[11px] text-zinc-500 truncate max-w-[60%]">{item.source}</span>
+                        <span className="text-[11px] text-zinc-600 shrink-0">{item.dateLabel}</span>
+                      </div>
+                    </div>
+
+                  </CardContent>
+                </Card>
+              </motion.a>
+            ))}
+          </div>
+        )}
       </motion.div>
 
     </div>

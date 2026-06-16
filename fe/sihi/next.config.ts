@@ -2,8 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  // Dùng webpack thay Turbopack (Turbopack 16.x bị lỗi crash liên tục)
   turbopack: undefined,
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**" }, // Cho phép ảnh từ mọi domain (Google News images)
+    ],
+  },
 };
 
 export default nextConfig;

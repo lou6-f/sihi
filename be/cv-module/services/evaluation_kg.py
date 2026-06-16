@@ -1,6 +1,5 @@
 from typing import Any
 
-from db.mongodb import get_db
 from db.repositories.question_repo import QuestionRepository
 from services.language_guard import SupportedLanguage, detect_target_language
 
@@ -113,8 +112,7 @@ async def load_evaluation_kg_context(question_session_id: str | None) -> tuple[s
     if not question_session_id:
         return None, None
 
-    db = await get_db()
-    question_doc = await QuestionRepository(db).get_by_session_id(question_session_id)
+    question_doc = await QuestionRepository().get_by_session_id(question_session_id)
     return build_evaluation_kg_context(question_doc)
 
 
@@ -124,8 +122,7 @@ async def load_evaluation_context_info(
     if not question_session_id:
         return None, None, None
 
-    db = await get_db()
-    question_doc = await QuestionRepository(db).get_by_session_id(question_session_id)
+    question_doc = await QuestionRepository().get_by_session_id(question_session_id)
     kg_context, kg_enrichment = build_evaluation_kg_context(question_doc)
     if not question_doc:
         return kg_context, kg_enrichment, None
