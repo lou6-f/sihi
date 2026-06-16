@@ -78,16 +78,6 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="relative z-10 flex flex-col items-center px-6 pt-20 pb-16 text-center md:pt-32">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <Badge variant="secondary" className="mb-6 gap-1 rounded-full px-4 py-1.5 text-sm">
-            <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-            Nền tảng luyện phỏng vấn IT #1
-          </Badge>
-        </motion.div>
 
         <motion.h1
           className="max-w-4xl text-4xl font-extrabold leading-tight md:text-6xl lg:text-7xl"

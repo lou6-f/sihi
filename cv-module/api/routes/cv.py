@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 
 from core.config import get_settings
 from core.exceptions import FileTooLargeException, InvalidFileTypeException, SessionNotFoundException
-from db.mongodb import get_db
 from db.repositories.cv_repo import CVRepository
 from db.repositories.question_repo import QuestionRepository
 from models.career_kg import KGEnrichmentPayload
@@ -144,9 +143,8 @@ async def _process_pipeline(
     processing_time_ms = int((time.perf_counter() - started_at) * 1000)
 
     try:
-        db = await get_db()
-        cv_repo = CVRepository(db)
-        question_repo = QuestionRepository(db)
+        cv_repo = CVRepository()
+        question_repo = QuestionRepository()
 
         cv_doc = {
             "session_id": session_id,
@@ -232,8 +230,7 @@ async def analyze_cv_endpoint(
 
 @router.get("/cv/{session_id}")
 async def get_cv_analysis(request: Request, session_id: str):
-    db = await get_db()
-    cv_repo = CVRepository(db)
+    cv_repo = CVRepository()
     cv_doc = await cv_repo.get_by_session_id(session_id)
     if cv_doc is not None:
         return cv_doc
@@ -254,6 +251,5 @@ async def get_cv_history(user_id: str, page: int = 1, limit: int = 10):
     if page < 1 or limit < 1:
         raise HTTPException(status_code=400, detail="page and limit must be positive")
 
-    db = await get_db()
-    cv_repo = CVRepository(db)
+    cv_repo = CVRepository()
     return await cv_repo.list_history_by_user(user_id=user_id, page=page, limit=limit)

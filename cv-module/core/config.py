@@ -8,14 +8,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    mongodb_atlas_uri: str = Field(alias="MONGODB_ATLAS_URI")
-    mongodb_db_name: str = Field(default="cv_interview_app", alias="MONGODB_DB_NAME")
+    # ─── Database (PostgreSQL / Supabase) ───
+    database_url: str = Field(alias="DATABASE_URL")
 
+    # ─── Gemini ───
     gemini_api_key: str = Field(alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-3.1-flash-lite-preview", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-2.0-flash", alias="GEMINI_MODEL")
 
+    # ─── Redis ───
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
 
+    # ─── MinerU ───
     mineru_model_source: Literal["huggingface", "modelscope", "local"] = Field(
         default="huggingface", alias="MINERU_MODEL_SOURCE"
     )
@@ -28,6 +31,7 @@ class Settings(BaseSettings):
         "hybrid-http-client",
     ] = Field(default="pipeline", alias="MINERU_BACKEND")
 
+    # ─── Knowledge Graph ───
     kg_enabled: bool = Field(default=True, alias="KG_ENABLED")
     kg_mode: Literal["disabled", "auto", "heuristic", "model", "graph"] = Field(
         default="auto", alias="KG_MODE"
@@ -36,6 +40,7 @@ class Settings(BaseSettings):
     kg_artifact_dir: str = Field(default="./data/tinix_kg", alias="KG_ARTIFACT_DIR")
     kg_timeout_seconds: int = Field(default=10, alias="KG_TIMEOUT_SECONDS")
 
+    # ─── App limits ───
     max_file_size_mb: int = Field(default=10, alias="MAX_FILE_SIZE_MB")
     max_questions: int = Field(default=20, alias="MAX_QUESTIONS")
     task_ttl_seconds: int = Field(default=3600, alias="TASK_TTL_SECONDS")

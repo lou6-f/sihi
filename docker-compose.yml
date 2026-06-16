@@ -2,21 +2,8 @@ version: "3.9"
 
 services:
   # ─────────────────────────────────────
-  # Infrastructure
+  # Redis — job tracking / cache
   # ─────────────────────────────────────
-  mongo:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     ports:
@@ -50,6 +37,7 @@ services:
 
   # ─────────────────────────────────────
   # CV Module (FastAPI + MinerU + Tinix KG)
+  # DB: Supabase PostgreSQL (chung với SiHi)
   # ─────────────────────────────────────
   cv-module:
     build:
@@ -59,8 +47,6 @@ services:
       - "8002:8000"
     env_file: ./cv-module/.env
     depends_on:
-      mongo:
-        condition: service_healthy
       redis:
         condition: service_healthy
     deploy:
@@ -73,7 +59,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 360s  # MinerU khởi động chậm, chờ 6 phút
+      start_period: 360s
 
   # ─────────────────────────────────────
   # WebSocket Server
@@ -94,5 +80,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  mongo_data:
   redis_data:

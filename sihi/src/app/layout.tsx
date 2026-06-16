@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
-  title: "SiHi — Tư duy thuật toán, bản lĩnh phỏng vấn",
+  title: "SiHi",
   description:
     "Nền tảng luyện phỏng vấn IT thông minh với AI. Phỏng vấn giả lập, phân tích CV, đánh giá kỹ năng và lộ trình học tập cá nhân hóa.",
   keywords: ["phỏng vấn IT", "luyện phỏng vấn", "AI interview", "SiHi", "tuyển dụng IT"],

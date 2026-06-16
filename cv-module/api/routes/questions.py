@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 
 from core.config import get_settings
 from core.exceptions import SessionNotFoundException
-from db.mongodb import get_db
 from db.repositories.question_repo import QuestionRepository
 from models.interview import AnswerUpdateRequest, JobQuestionGenerationRequest
 from services.career_kg import build_job_kg_enrichment, enrich_questions_with_kg_metadata
@@ -77,8 +76,7 @@ async def _process_job_questions(
         return
 
     try:
-        db = await get_db()
-        repo = QuestionRepository(db)
+        repo = QuestionRepository()
         doc = {
             "session_id": session_id,
             "analysis_id": "",
@@ -133,8 +131,7 @@ async def create_questions_from_job(
 
 @router.get("/questions/{session_id}")
 async def get_questions(request: Request, session_id: str):
-    db = await get_db()
-    repo = QuestionRepository(db)
+    repo = QuestionRepository()
     doc = await repo.get_by_session_id(session_id)
     if doc is not None:
         return doc
@@ -157,8 +154,7 @@ async def update_question_answer(session_id: str, question_index: int, payload: 
     if question_index < 0:
         raise HTTPException(status_code=400, detail="question_index must be >= 0")
 
-    db = await get_db()
-    repo = QuestionRepository(db)
+    repo = QuestionRepository()
 
     existing = await repo.get_by_session_id(session_id)
     if existing is None:

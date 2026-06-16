@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 
 from core.config import get_settings
 from core.exceptions import InvalidTranscriptException, SessionNotFoundException
-from db.mongodb import get_db
 from db.repositories.evaluation_repo import EvaluationRepository
 from models.evaluation import EvaluationRequest
 from services.evaluation_kg import load_evaluation_context_info
@@ -93,8 +92,7 @@ async def _process_evaluation(
 
     try:
         processing_time_ms = int((time.perf_counter() - started_at) * 1000)
-        db = await get_db()
-        repo = EvaluationRepository(db)
+        repo = EvaluationRepository()
 
         doc = {
             "session_id": session_id,
@@ -147,15 +145,13 @@ async def get_evaluation_history(user_id: str, page: int = 1, limit: int = 10):
     if page < 1 or limit < 1:
         raise HTTPException(status_code=400, detail="page and limit must be positive")
 
-    db = await get_db()
-    repo = EvaluationRepository(db)
+    repo = EvaluationRepository()
     return await repo.list_history_by_user(user_id=user_id, page=page, limit=limit)
 
 
 @router.get("/evaluations/by-interview/{interview_session_id}")
 async def get_evaluation_by_interview(interview_session_id: str):
-    db = await get_db()
-    repo = EvaluationRepository(db)
+    repo = EvaluationRepository()
     doc = await repo.get_by_interview_session_id(interview_session_id)
     if doc is None:
         raise SessionNotFoundException()
@@ -164,8 +160,7 @@ async def get_evaluation_by_interview(interview_session_id: str):
 
 @router.get("/evaluations/{session_id}")
 async def get_evaluation(request: Request, session_id: str):
-    db = await get_db()
-    repo = EvaluationRepository(db)
+    repo = EvaluationRepository()
     doc = await repo.get_by_session_id(session_id)
     if doc is not None:
         return doc

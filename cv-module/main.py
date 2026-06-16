@@ -12,7 +12,7 @@ from api.routes.cv import router as cv_router
 from api.routes.evaluation import router as evaluation_router
 from api.routes.questions import router as questions_router
 from core.config import get_settings
-from db.mongodb import close_mongodb, init_mongodb
+from db.postgres import close_postgres, init_postgres
 from services.parser import ResumeParseError, warmup_mineru
 
 
@@ -27,9 +27,9 @@ async def lifespan(app: FastAPI):
     redis_client = None
     logger.info("Startup: initializing application")
     try:
-        logger.info("Startup: connecting to MongoDB")
-        await init_mongodb()
-        logger.info("Startup: MongoDB ready")
+        logger.info("Startup: connecting to PostgreSQL")
+        await init_postgres()
+        logger.info("Startup: PostgreSQL ready (tables created)")
 
         logger.info("Startup: connecting to Redis")
         redis_client = redis.from_url(settings.redis_url, decode_responses=True)
@@ -72,8 +72,8 @@ async def lifespan(app: FastAPI):
         logger.info("Shutdown: starting")
         app.state.ready = False
         app.state.startup_phase = "stopping"
-        await close_mongodb()
-        logger.info("Shutdown: MongoDB closed")
+        await close_postgres()
+        logger.info("Shutdown: PostgreSQL closed")
         if redis_client is not None:
             await redis_client.aclose()
             logger.info("Shutdown: Redis closed")
