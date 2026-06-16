@@ -62,29 +62,19 @@ cd sihi && npm install
 **File 1 — cho Docker** (`SiHi/.env`):
 ```bash
 cp .env.example .env
-```
-Chỉnh `WS_JWT_SECRET` thành 1 chuỗi random:
-```env
-WS_JWT_SECRET="chuoi-random-32-ky-tu"
+# Điền WS_JWT_SECRET vào .env
 ```
 
-**File 2 — cho Next.js app** (`SiHi/sihi/.env`): tạo mới với nội dung:
-```env
-DATABASE_URL="postgresql://user:password@host:5432/sihi"
-NEXTAUTH_SECRET="chuoi-random-32-ky-tu"
-WS_JWT_SECRET="chuoi-random-32-ky-tu-giong-file-tren"
-GEMINI_API_KEYS="your-gemini-api-key"
-AI_PROVIDER=gemini
-GEMINI_MODEL="gemini-2.0-flash"
-NEXTAUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_WS_URL="ws://localhost:3001"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_STT_FALLBACK=webspeech
-EMAIL_PROVIDER=mock
-UPLOAD_DIR="./data/uploads"
+**File 2 — cho Next.js app** (`SiHi/sihi/.env`):
+```bash
+cd sihi
+cp .env.example .env
+# Điền DATABASE_URL, NEXTAUTH_SECRET, WS_JWT_SECRET, GEMINI_API_KEYS
 ```
 
-> 💡 Tạo secret: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+> Mở `sihi/.env.example` — mỗi biến đều có giải thích bằng tiếng Việt
+
+> 💡 Tạo secret: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` 
 
 > ⚠️ `WS_JWT_SECRET` phải **giống nhau** ở cả 2 file `.env`
 
