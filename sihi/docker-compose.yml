@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL + pgvector ───────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sihi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sihi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sihi_dev_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── WebSocket Server ────────────────────
+  ws-server:
+    build:
+      context: ./ws-server
+      dockerfile: Dockerfile
+    container_name: sihi-ws-server
+    restart: unless-stopped
+    environment:
+      WS_PORT: 3001
+      WS_JWT_SECRET: ${WS_JWT_SECRET}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── PhoWhisper STT Service ──────────────
+  stt-service:
+    build:
+      context: ./stt-service
+      dockerfile: Dockerfile
+    container_name: sihi-stt
+    restart: unless-stopped
+    environment:
+      STT_PORT: 8001
+      MODEL_SIZE: base
+    ports:
+      - "8001:8001"
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # ─── Next.js App ─────────────────────────
+  # Chỉ chạy khi dùng profile "full":
+  #   docker compose --profile full up -d
+  # Dev bình thường dùng: npm run dev
+  app:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sihi-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      WS_JWT_SECRET: ${WS_JWT_SECRET}
+      GEMINI_API_KEYS: ${GEMINI_API_KEYS}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3001}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ws-server:
+        condition: service_started
+
+volumes:
+  pgdata:
