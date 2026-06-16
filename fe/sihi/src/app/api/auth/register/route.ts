@@ -50,8 +50,11 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     if (error instanceof Error && error.name === "ZodError") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const zodError = error as any;
+      const firstMessage = zodError.errors?.[0]?.message || "Dữ liệu không hợp lệ";
       return NextResponse.json(
-        { error: "Dữ liệu không hợp lệ", details: error },
+        { error: firstMessage },
         { status: 400 }
       );
     }

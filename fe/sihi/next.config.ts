@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Bật standalone output để Docker image gọn hơn (~3x nhỏ hơn)
   output: "standalone",
+  // Dùng webpack thay Turbopack (Turbopack 16.x bị lỗi crash liên tục)
+  turbopack: undefined,
 };
 
 export default nextConfig;

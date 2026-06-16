@@ -8,39 +8,92 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Lock } from "lucide-react";
+import { Loader2, User, Mail, Lock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+
+// ─── Validation rules ───────────────────────────────────────
+
+function validateName(v: string) {
+  if (!v) return "Vui lòng nhập họ và tên";
+  if (v.trim().length < 2) return "Tên phải có ít nhất 2 ký tự";
+  if (v.trim().length > 100) return "Tên không được quá 100 ký tự";
+  return "";
+}
+
+function validateEmail(v: string) {
+  if (!v) return "Vui lòng nhập email";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Email không hợp lệ (ví dụ: you@gmail.com)";
+  return "";
+}
+
+const pwdRules = [
+  { label: "Ít nhất 8 ký tự", test: (v: string) => v.length >= 8 },
+  { label: "Có ít nhất 1 chữ HOA (A-Z)", test: (v: string) => /[A-Z]/.test(v) },
+  { label: "Có ít nhất 1 chữ số (0-9)", test: (v: string) => /[0-9]/.test(v) },
+];
+
+function validatePassword(v: string) {
+  if (!v) return "Vui lòng nhập mật khẩu";
+  for (const rule of pwdRules) {
+    if (!rule.test(v)) return rule.label + " — chưa đáp ứng";
+  }
+  return "";
+}
+
+function validateConfirm(v: string, pwd: string) {
+  if (!v) return "Vui lòng xác nhận mật khẩu";
+  if (v !== pwd) return "Mật khẩu xác nhận không khớp";
+  return "";
+}
+
+// ─── Component ───────────────────────────────────────────────
 
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
-  const [error, setError] = useState("");
+  const [touched, setTouched] = useState({ name: false, email: false, password: false, confirmPassword: false });
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const touch = (key: keyof typeof touched) => () =>
+    setTouched((t) => ({ ...t, [key]: true }));
+
+  // Per-field errors (only shown after touched)
+  const errors = {
+    name: touched.name ? validateName(form.name) : "",
+    email: touched.email ? validateEmail(form.email) : "",
+    password: touched.password ? validatePassword(form.password) : "",
+    confirmPassword: touched.confirmPassword ? validateConfirm(form.confirmPassword, form.password) : "",
+  };
+
+  const isValid =
+    !validateName(form.name) &&
+    !validateEmail(form.email) &&
+    !validatePassword(form.password) &&
+    !validateConfirm(form.confirmPassword, form.password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
-    if (form.password !== form.confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp");
-      return;
-    }
+    setServerError("");
+    // Touch all fields to show all errors
+    setTouched({ name: true, email: true, password: true, confirmPassword: true });
+    if (!isValid) return;
 
     setLoading(true);
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+      body: JSON.stringify({ name: form.name.trim(), email: form.email, password: form.password }),
     });
 
     const data = await res.json();
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error || "Đăng ký thất bại");
+      setServerError(data.error || "Đăng ký thất bại, vui lòng thử lại");
       return;
     }
 
@@ -55,43 +108,107 @@ export default function RegisterPage() {
           <CardTitle className="text-2xl font-bold">Đăng ký</CardTitle>
           <CardDescription className="text-zinc-400">Tạo tài khoản SiHi miễn phí</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-red-400">{error}</div>}
 
-            <div className="space-y-2">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {/* Server error */}
+            {serverError && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-red-400">
+                {serverError}
+              </div>
+            )}
+
+            {/* Họ và tên */}
+            <div className="space-y-1">
               <Label htmlFor="name">Họ và tên</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="name" placeholder="Nguyễn Văn A" value={form.name} onChange={set("name")} className="pl-10" required />
+                <Input
+                  id="name"
+                  placeholder="Nguyễn Văn A"
+                  value={form.name}
+                  onChange={set("name")}
+                  onBlur={touch("name")}
+                  className={`pl-10 ${errors.name ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                />
               </div>
+              {errors.name && <p className="text-xs text-red-400">⚠ {errors.name}</p>}
             </div>
 
-            <div className="space-y-2">
+            {/* Email */}
+            <div className="space-y-1">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="email" type="email" placeholder="you@example.com" value={form.email} onChange={set("email")} className="pl-10" required />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={set("email")}
+                  onBlur={touch("email")}
+                  className={`pl-10 ${errors.email ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                />
               </div>
+              {errors.email && <p className="text-xs text-red-400">⚠ {errors.email}</p>}
             </div>
 
-            <div className="space-y-2">
+            {/* Mật khẩu */}
+            <div className="space-y-1">
               <Label htmlFor="password">Mật khẩu</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="password" type="password" placeholder="Tối thiểu 8 ký tự, 1 chữ hoa, 1 số" value={form.password} onChange={set("password")} className="pl-10" required />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Ví dụ: Long@2024"
+                  value={form.password}
+                  onChange={set("password")}
+                  onBlur={touch("password")}
+                  className={`pl-10 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                />
               </div>
+              {/* Password strength checklist */}
+              {(touched.password || form.password) && (
+                <ul className="mt-1 space-y-0.5">
+                  {pwdRules.map((rule) => {
+                    const ok = rule.test(form.password);
+                    return (
+                      <li key={rule.label} className={`flex items-center gap-1.5 text-xs ${ok ? "text-green-400" : "text-zinc-500"}`}>
+                        {ok
+                          ? <CheckCircle2 className="h-3 w-3 shrink-0" />
+                          : <XCircle className="h-3 w-3 shrink-0 text-red-400" />}
+                        <span className={!ok ? "text-red-400" : ""}>{rule.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
-            <div className="space-y-2">
+            {/* Xác nhận mật khẩu */}
+            <div className="space-y-1">
               <Label htmlFor="confirmPassword">Xác nhận mật khẩu</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="confirmPassword" type="password" placeholder="Nhập lại mật khẩu" value={form.confirmPassword} onChange={set("confirmPassword")} className="pl-10" required />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Nhập lại mật khẩu"
+                  value={form.confirmPassword}
+                  onChange={set("confirmPassword")}
+                  onBlur={touch("confirmPassword")}
+                  className={`pl-10 ${errors.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                />
               </div>
+              {errors.confirmPassword && <p className="text-xs text-red-400">⚠ {errors.confirmPassword}</p>}
             </div>
 
-            <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full bg-violet-600 hover:bg-violet-700"
+              disabled={loading}
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Đăng ký
             </Button>
@@ -99,7 +216,9 @@ export default function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-zinc-400">
             Đã có tài khoản?{" "}
-            <Link href="/login" className="font-medium text-violet-400 hover:text-violet-300">Đăng nhập</Link>
+            <Link href="/login" className="font-medium text-violet-400 hover:text-violet-300">
+              Đăng nhập
+            </Link>
           </p>
         </CardContent>
       </Card>

@@ -147,8 +147,7 @@ export default function InterviewSetupPage() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold">Bắt đầu phỏng vấn</h1>
-        <p className="mt-0.5 text-sm text-zinc-400">Thiết lập nhanh — AI sẽ tạo câu hỏi phù hợp</p>
+        <h1 className="text-3xl font-bold">Thiết lập thông tin phỏng vấn</h1>
       </motion.div>
 
       {/* ── 1. Lĩnh vực ─────────────────────────────────────────────────── */}
@@ -323,7 +322,7 @@ export default function InterviewSetupPage() {
         >
           {starting
             ? <><Loader2 className="h-5 w-5 animate-spin" /> Đang tạo phỏng vấn...</>
-            : <><BrainCircuit className="h-5 w-5" /> Bắt đầu phỏng vấn</>
+            : <><BrainCircuit className="h-5 w-5" /> Thiết lập thông tin phỏng vấn</>
           }
         </Button>
         {!field || !level ? (

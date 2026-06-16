@@ -6,6 +6,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 
+# Copy prisma schema & generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
 # Copy source
 COPY . .
 

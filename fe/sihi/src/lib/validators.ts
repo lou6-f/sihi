@@ -56,9 +56,9 @@ export const updateProfileSchema = z.object({
     .optional(),
   yearOfStudy: z
     .number()
-    .int("Năm học phải là số nguyên")
-    .min(1, "Năm học tối thiểu là 1")
-    .max(10, "Năm học tối đa là 10")
+    .int()
+    .min(1, "Vui lòng chọn năm học")
+    .max(6, "Vui lòng chọn năm học")
     .optional(),
   itField: z
     .string()

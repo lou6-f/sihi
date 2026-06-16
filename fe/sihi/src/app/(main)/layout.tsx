@@ -9,7 +9,6 @@ import {
   User, Shield, LogOut, Menu, X, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SiHiLogo } from "@/components/shared/sihi-logo";
 import { InterviewGuardProvider, useInterviewGuard } from "@/contexts/interview-guard-context";
@@ -60,11 +59,11 @@ function NavLink({
     <Link
       href={href}
       onClick={handleClick}
-      className={`flex items-center gap-5 rounded-2xl px-5 py-4 text-base font-semibold transition-all ${
+      className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
         active ? "bg-violet-500/15 text-violet-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
       }`}
     >
-      <Icon className="h-6 w-6 shrink-0" />
+      <Icon className="h-5 w-5 shrink-0" />
       {label}
     </Link>
   );
@@ -80,13 +79,13 @@ function MainLayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar — giữ cỡ chữ 16px để không bị ảnh hưởng bởi html font-size 17px */}
-      <aside className="hidden w-96 flex-col border-r border-zinc-800 bg-zinc-900/30 md:flex" style={{ fontSize: "16px" }}>
-        <div className="flex h-28 items-center gap-3 px-8">
-          <SiHiLogo iconSize={60} textSize="2.2rem" />
+      {/* Desktop Sidebar */}
+      <aside className="hidden w-64 flex-col border-r border-zinc-800 bg-zinc-900/30 md:flex" style={{ fontSize: "14px" }}>
+        <div className="flex h-16 items-center gap-2 px-5">
+          <SiHiLogo iconSize={40} textSize="1.5rem" />
         </div>
 
-        <nav className="flex-1 space-y-1.5 px-5 py-6">
+        <nav className="flex-1 space-y-0.5 px-3 py-3">
           {navItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -96,29 +95,40 @@ function MainLayoutInner({ children }: { children: React.ReactNode }) {
 
           {session?.user?.role === "ADMIN" && (
             <>
-              <Separator className="my-3 bg-zinc-800" />
+              <Separator className="my-2 bg-zinc-800" />
               <Link
                 href="/admin/dashboard"
-                className="flex items-center gap-5 rounded-2xl px-5 py-4 text-lg font-semibold text-amber-400 hover:bg-zinc-800"
+                className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-amber-400 hover:bg-zinc-800"
               >
-                <Shield className="h-6 w-6 shrink-0" />
+                <Shield className="h-5 w-5 shrink-0" />
                 Admin Panel
               </Link>
             </>
           )}
         </nav>
 
-        <div className="border-t border-zinc-800 p-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-violet-600 text-lg">{initials}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-lg font-bold">{session?.user?.name}</p>
-              <p className="truncate text-sm text-zinc-500">{session?.user?.email}</p>
+        <div className="border-t border-zinc-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full overflow-hidden shrink-0 ring-2 ring-violet-500/30">
+              {session?.user?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/uploads/${(session.user.avatar as string).replace(/\\/g, "/")}`}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">{initials}</span>
+                </div>
+              )}
             </div>
-            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-red-400" onClick={() => signOut({ callbackUrl: "/" })}>
-              <LogOut className="h-6 w-6" />
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-semibold">{session?.user?.name}</p>
+              <p className="truncate text-xs text-zinc-500">{session?.user?.email}</p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-400" onClick={() => signOut({ callbackUrl: "/" })}>
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>

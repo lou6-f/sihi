@@ -47,17 +47,17 @@ export async function processMessage(
           return;
         }
 
-        // Mark as IN_PROGRESS
+        // Mark as PROCESSING (interview started)
         await prisma.interview.update({
           where: { id: interviewId },
-          data: { status: "IN_PROGRESS", startedAt: new Date() },
+          data: { status: "PROCESSING", startedAt: new Date() },
         });
 
         send(ws, { type: "STATE_CHANGE", state: "PROCESSING" });
 
         // Load first pending AI message
         const firstMessage = await prisma.interviewMessage.findFirst({
-          where: { interviewId, role: "ASSISTANT" },
+          where: { interviewId, role: "AI" },
           orderBy: { createdAt: "asc" },
           select: { content: true, questionNumber: true, category: true, difficulty: true },
         });
@@ -106,7 +106,7 @@ export async function processMessage(
 
         // Get the latest AI response (already saved via HTTP API)
         const latestAI = await prisma.interviewMessage.findFirst({
-          where: { interviewId, role: "ASSISTANT" },
+          where: { interviewId, role: "AI" },
           orderBy: { createdAt: "desc" },
           select: { content: true, questionNumber: true, category: true, difficulty: true },
         });

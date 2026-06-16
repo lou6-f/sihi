@@ -44,6 +44,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          avatar: user.avatar ?? null,
           emailVerified: user.emailVerified ? true : false,
         };
       },
@@ -54,12 +55,27 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session: sessionUpdate }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
-        token.emailVerified = (user as { emailVerified: boolean })
-          .emailVerified;
+        token.avatar = (user as { avatar?: string | null }).avatar ?? null;
+        token.emailVerified = (user as { emailVerified: boolean }).emailVerified;
+      }
+      // Backward compat: JWT cũ chưa có avatar → fetch 1 lần từ DB
+      if (token.id && token.avatar === undefined && !trigger) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { avatar: true },
+        });
+        token.avatar = dbUser?.avatar ?? null;
+      }
+      // Khi client gọi update() — cập nhật avatar/name trong token
+      if (trigger === "update" && sessionUpdate?.avatar !== undefined) {
+        token.avatar = sessionUpdate.avatar;
+      }
+      if (trigger === "update" && sessionUpdate?.name !== undefined) {
+        token.name = sessionUpdate.name;
       }
       return token;
     },
@@ -67,6 +83,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.avatar = (token.avatar as string | null) ?? null;
         session.user.emailVerified = token.emailVerified as boolean;
       }
       return session;
