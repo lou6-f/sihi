@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL + pgvector ───────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sihi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sihi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sihi_dev_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── WebSocket Server ────────────────────
+  ws-server:
+    build:
+      context: ./ws-server
+      dockerfile: Dockerfile
+    container_name: sihi-ws-server
+    restart: unless-stopped
+    environment:
+      WS_PORT: 3001
+      WS_JWT_SECRET: ${WS_JWT_SECRET}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── PhoWhisper STT Service ──────────────
+  stt-service:
+    build:
+      context: ./stt-service
+      dockerfile: Dockerfile
+    container_name: sihi-stt
+    restart: unless-stopped
+    environment:
+      STT_PORT: 8001
+      MODEL_SIZE: base
+    ports:
+      - "8001:8001"
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  pgdata:

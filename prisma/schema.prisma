@@ -1,0 +1,564 @@
+// Prisma Schema for SiHi
+// 21 models — v4.2 FINAL
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector", schema: "public")]
+}
+
+// ═══════════════════════════════════════
+// Enums
+// ═══════════════════════════════════════
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum InterviewField {
+  FRONTEND
+  BACKEND
+  DATA
+  FULLSTACK
+}
+
+enum InterviewLevel {
+  INTERN
+  FRESHER
+  JUNIOR
+}
+
+enum InterviewStatus {
+  PREPARING
+  CONNECTING
+  READY
+  AI_SPEAKING
+  USER_SPEAKING
+  PROCESSING
+  PAUSED
+  COMPLETED
+  CANCELLED
+  ERROR
+}
+
+enum ResourceType {
+  ARTICLE
+  ROADMAP
+  VIDEO
+  EXTERNAL_LINK
+}
+
+enum ResourceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ResourceStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ReadinessLevel {
+  NOT_READY
+  NEEDS_PRACTICE
+  GOOD
+  READY
+}
+
+enum MessageRole {
+  AI
+  USER
+  SYSTEM
+}
+
+enum QuestionCategory {
+  FOUNDATION
+  TECHNICAL
+  PROJECT
+  ALGORITHM
+  SITUATIONAL
+  BEHAVIORAL
+}
+
+// ═══════════════════════════════════════
+// User & Auth
+// ═══════════════════════════════════════
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  password      String
+  emailVerified Boolean  @default(false)
+  avatar        String?
+  school        String?
+  major         String?
+  yearOfStudy   Int?
+  itField       String?
+  role          Role     @default(USER)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cvs                 CV[]
+  interviews          Interview[]
+  resourceSuggestions AiResourceSuggestion[]
+  adminLogs           AdminLog[]
+  accounts            Account[]
+  skills              UserSkill[]
+  progressSnapshots   UserProgressSnapshot[]
+  passwordResetOtps   PasswordResetOtp[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// ═══════════════════════════════════════
+// Password Reset OTP
+// ═══════════════════════════════════════
+
+model PasswordResetOtp {
+  id        String    @id @default(cuid())
+  userId    String
+  email     String
+  otpHash   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, createdAt])
+  @@map("password_reset_otps")
+}
+
+// ═══════════════════════════════════════
+// CV
+// ═══════════════════════════════════════
+
+model CV {
+  id          String   @id @default(cuid())
+  userId      String
+  fileName    String
+  displayName String?
+  filePath    String
+  fileSize    Int
+  mimeType    String   @default("application/pdf")
+  orderIndex  Int      @default(0)
+  analysis    Json?
+  createdAt   DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews Interview[]
+
+  @@map("cvs")
+}
+
+// ═══════════════════════════════════════
+// Interview
+// ═══════════════════════════════════════
+
+model Interview {
+  id                    String          @id @default(cuid())
+  userId                String
+  cvId                  String?
+  templateId            String?
+  field                 InterviewField
+  level                 InterviewLevel  @default(FRESHER)
+  totalScore            Int?
+  status                InterviewStatus @default(PREPARING)
+  questionCount         Int             @default(0)
+  maxQuestions          Int             @default(10)
+  duration              Int?
+  difficultyProgression Json?
+  startedAt             DateTime?
+  endedAt               DateTime?
+  createdAt             DateTime        @default(now())
+  // JD-Based Interview
+  targetRole            String?
+  jobDescription        String?
+  jdMode                String?         // "CV_JD" | "JD_ONLY" | "GENERAL"
+  // Interview Plan (AI-generated before start)
+  interviewPlan         Json?
+
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cv               CV?                       @relation(fields: [cvId], references: [id])
+  template         InterviewTemplate?        @relation(fields: [templateId], references: [id])
+  messages         InterviewMessage[]
+  report           InterviewReport?
+  scoreBreakdown   InterviewScoreBreakdown[]
+  skillAssessments SkillAssessment[]
+
+  @@map("interviews")
+}
+
+model InterviewMessage {
+  id             String            @id @default(cuid())
+  interviewId    String
+  role           MessageRole
+  content        String
+  audioUrl       String?
+  questionNumber Int?
+  category       QuestionCategory?
+  difficulty     Int?
+  aiEvaluation   Json?
+  createdAt      DateTime          @default(now())
+  // Adaptive interview fields
+  nextAction     String?           // "ASK_NEW_QUESTION"|"FOLLOW_UP"|"DEEP_DIVE"|"GIVE_HINT"|"REDUCE_DIFFICULTY"|"CLARIFY_ANSWER"|"EXPLAIN_BRIEFLY"|"PROJECT_DISCUSSION"
+  unknownAttempts Int?             // 0-3: consecutive unknown answers for this topic
+  vocalMetrics   Json?             // { wpm, fillerCount, fillerWords, durationMs, wordCount }
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("interview_messages")
+}
+
+// ═══════════════════════════════════════
+// Interview Report
+// ═══════════════════════════════════════
+
+model InterviewReport {
+  id                   String         @id @default(cuid())
+  interviewId          String         @unique
+  overallScore         Int
+  criteriaScores       Json
+  overallComment       String
+  strengths            Json
+  weaknesses           Json
+  goodAnswers          Json
+  improvementAreas     Json
+  suggestedAnswers     Json
+  learningPath         Json
+  recommendedResources Json
+  readinessLevel       ReadinessLevel
+  createdAt            DateTime       @default(now())
+  // Advanced evaluation fields (v2)
+  dimensionScores      Json?          // { technicalKnowledge, reasoningAbility, projectExperience, communication, learningAbility, confidence }
+  vocalAnalysis        Json?          // { avgWpm, totalFillers, fillerWords, totalSpeakingMs, wpmWarning }
+  softSkillsRadar      Json?          // { teamwork, communication, problemSolving, confidence } 0-100
+  skillGaps            Json?          // [{ skill, severity: "CRITICAL"|"IMPORTANT"|"OPTIONAL", evidence }]
+  starEvaluations      Json?          // [{ questionNumber, situation, task, action, result, totalScore }]
+  learningRoadmap      Json?          // [{ topic, priority, reason, resources[] }]
+  competencyProfile    Json?          // Nhóm 2: { learningAbility, confidence, teamwork, initiative } mỗi key: { score, comment }
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("interview_reports")
+}
+
+model InterviewScoreBreakdown {
+  id           String   @id @default(cuid())
+  interviewId  String
+  criteriaName String
+  score        Int
+  weight       Float    @default(1.0)
+  comment      String?
+  createdAt    DateTime @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId, criteriaName])
+  @@map("interview_score_breakdowns")
+}
+
+// ═══════════════════════════════════════
+// Interview Template Engine
+// ═══════════════════════════════════════
+
+model InterviewTemplate {
+  id              String         @id @default(cuid())
+  name            String
+  field           InterviewField
+  level           InterviewLevel
+  questionCount   Int            @default(10)
+  durationMinutes Int            @default(20)
+  isActive        Boolean        @default(true)
+  description     String?
+  createdBy       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  sections   InterviewTemplateSection[]
+  rubric     InterviewRubric[]
+  interviews Interview[]
+
+  @@unique([field, level])
+  @@map("interview_templates")
+}
+
+model InterviewTemplateSection {
+  id            String           @id @default(cuid())
+  templateId    String
+  category      QuestionCategory
+  questionCount Int              @default(2)
+  difficultyMin Int              @default(1)
+  difficultyMax Int              @default(3)
+  weight        Float            @default(1.0)
+  orderIndex    Int              @default(0)
+  description   String?
+
+  template  InterviewTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  questions InterviewQuestionBank[]
+
+  @@map("interview_template_sections")
+}
+
+model InterviewQuestionBank {
+  id             String           @id @default(cuid())
+  sectionId      String
+  question       String
+  expectedAnswer String?
+  difficulty     Int              @default(3)
+  field          InterviewField
+  level          InterviewLevel
+  category       QuestionCategory
+  tags           String[]
+  isActive       Boolean          @default(true)
+  usageCount     Int              @default(0)
+  createdAt      DateTime         @default(now())
+
+  section InterviewTemplateSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@map("interview_question_bank")
+}
+
+model InterviewRubric {
+  id           String   @id @default(cuid())
+  templateId   String
+  criteriaName String
+  displayName  String
+  description  String
+  weight       Float    @default(1.0)
+  maxScore     Int      @default(100)
+  scoringGuide Json?
+  orderIndex   Int      @default(0)
+
+  template InterviewTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, criteriaName])
+  @@map("interview_rubrics")
+}
+
+// ═══════════════════════════════════════
+// RAG + Resources
+// ═══════════════════════════════════════
+
+model Resource {
+  id            String         @id @default(cuid())
+  title         String
+  description   String?
+  type          ResourceType
+  url           String
+  field         InterviewField
+  level         ResourceLevel  @default(BEGINNER)
+  summary       String?
+  status        ResourceStatus @default(DRAFT)
+  createdBy     String?
+  isAiGenerated Boolean        @default(false)
+  sourceId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  tags        ResourceTag[]
+  chunks      ResourceChunk[]
+  suggestions AiResourceSuggestion[]
+  source      ResourceSource?        @relation(fields: [sourceId], references: [id])
+
+  @@map("resources")
+}
+
+model ResourceTag {
+  id         String @id @default(cuid())
+  resourceId String
+  tag        String
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([tag])
+  @@map("resource_tags")
+}
+
+model ResourceSource {
+  id             String   @id @default(cuid())
+  url            String   @unique
+  domain         String
+  rawContent     String?
+  cleanedContent String?
+  metadata       Json?
+  crawledAt      DateTime @default(now())
+
+  resources Resource[]
+
+  @@map("resource_sources")
+}
+
+model ResourceChunk {
+  id         String   @id @default(cuid())
+  resourceId String
+  content    String
+  chunkIndex Int
+  tokenCount Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  resource  Resource           @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  embedding ResourceEmbedding?
+
+  @@index([resourceId])
+  @@map("resource_chunks")
+}
+
+model ResourceEmbedding {
+  id        String                      @id @default(cuid())
+  chunkId   String                      @unique
+  embedding Unsupported("vector(768)")
+  model     String                      @default("text-embedding-004")
+  createdAt DateTime                    @default(now())
+
+  chunk ResourceChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@map("resource_embeddings")
+}
+
+model AiResourceSuggestion {
+  id             String   @id @default(cuid())
+  resourceId     String
+  userId         String
+  interviewId    String?
+  reason         String
+  relevanceScore Float
+  skillArea      String?
+  createdAt      DateTime @default(now())
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_resource_suggestions")
+}
+
+// ═══════════════════════════════════════
+// User Analytics & Progress
+// ═══════════════════════════════════════
+
+model UserSkill {
+  id               String          @id @default(cuid())
+  userId           String
+  skillName        String
+  field            InterviewField?
+  currentScore     Float           @default(0)
+  totalAssessments Int             @default(0)
+  lastAssessedAt   DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments SkillAssessment[]
+
+  @@unique([userId, skillName])
+  @@map("user_skills")
+}
+
+model SkillAssessment {
+  id          String   @id @default(cuid())
+  skillId     String
+  interviewId String
+  score       Float
+  evidence    String?
+  createdAt   DateTime @default(now())
+
+  skill     UserSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@map("skill_assessments")
+}
+
+model UserProgressSnapshot {
+  id              String         @id @default(cuid())
+  userId          String
+  interviewId     String?
+  overallScore    Float
+  readinessLevel  ReadinessLevel
+  topSkills       Json
+  weakSkills      Json
+  fieldScores     Json
+  totalInterviews Int
+  suggestion      String?
+  snapshotAt      DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, snapshotAt])
+  @@map("user_progress_snapshots")
+}
+
+// ═══════════════════════════════════════
+// Admin
+// ═══════════════════════════════════════
+
+model AdminLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  target    String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@map("admin_logs")
+}
+
+// ═══════════════════════════════════════
+// API Provider Usage Log
+// ═══════════════════════════════════════
+
+model ApiProviderUsageLog {
+  id               String   @id @default(cuid())
+  provider         String
+  keyAlias         String
+  requestType      String
+  endpoint         String?
+  status           String
+  errorCode        String?
+  errorMessage     String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  latencyMs        Int?
+  createdAt        DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@index([keyAlias, status])
+  @@index([createdAt])
+  @@map("api_provider_usage_logs")
+}
