@@ -56,48 +56,46 @@ Mở file `.env` và chỉnh các giá trị **bắt buộc**:
 
 ---
 
-### Bước 3 — Khởi động các service bằng Docker
+### Bước 3 — Chọn cách chạy
 
-Docker chạy 3 service nền:
-- **PostgreSQL** (port 5432) — cơ sở dữ liệu
-- **WebSocket Server** (port 3001) — xử lý phỏng vấn real-time
-- **STT Service / PhoWhisper** (port 8001) — chuyển giọng nói thành văn bản
+#### Cách A — Dev (khuyên dùng khi code)
+
+Docker chạy 3 service nền, Next.js chạy riêng bằng npm:
 
 ```bash
+# Terminal 1: chạy services (postgres, ws-server, stt)
 docker compose up -d
+
+# Terminal 2: chạy Next.js với hot reload
+npm run dev
 ```
 
-Kiểm tra các service đã chạy:
+> Hot reload tức thì, debug dễ dàng.
+
+#### Cách B — Full Docker (khi demo hoặc người khác chạy thử)
+
+Chạy **tất cả** bằng 1 lệnh duy nhất (bao gồm cả Next.js):
 
 ```bash
-docker compose ps
+docker compose --profile full up -d
 ```
 
-> ⚠️ Lần đầu chạy sẽ mất vài phút để build image PhoWhisper (tải model AI ~500MB).
-> STT service **không bắt buộc** — nếu không cần nhận diện giọng nói, bỏ qua cũng được.
+> ⚠️ Lần đầu build mất 3–5 phút. Không có hot reload.
+
+Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
 
 ---
 
 ### Bước 4 — Khởi tạo database
+
+> **Chỉ cần chạy 1 lần** khi mới clone về:
 
 ```bash
 npx prisma db push
 npx prisma db seed
 ```
 
-> `db seed` tạo tài khoản admin mặc định.
-
----
-
-### Bước 5 — Chạy Next.js app
-
-```bash
-npm run dev
-```
-
-Mở trình duyệt: [http://localhost:3000](http://localhost:3000)
-
-**Tài khoản admin mặc định:** `admin@sihi.vn` / `Admin@123`
+> `db seed` tạo tài khoản admin mặc định: `admin@sihi.vn` / `Admin@123`
 
 ---
 
