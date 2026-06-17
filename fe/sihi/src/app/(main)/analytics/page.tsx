@@ -69,7 +69,8 @@ function formatSkillName(raw: string): string {
 }
 
 // Translate suggestion text — replace raw keys with Vietnamese names
-function formatSuggestion(raw: string): string {
+function formatSuggestion(raw: string | null | undefined): string {
+  if (!raw) return "";
   return raw.replace(/dim_[a-zA-Z]+|[a-z]+_[a-z]+/g, (match) => SKILL_LABELS[match] || match);
 }
 

@@ -34,7 +34,8 @@ const SKILL_NAME_VI: Record<string, string> = {
   teamwork: "Làm việc nhóm", initiative: "Tinh thần chủ động",
 };
 
-function translateSuggestion(raw: string): string {
+function translateSuggestion(raw: string | null | undefined): string {
+  if (!raw) return "";
   return raw.replace(/dim_[a-zA-Z]+|[a-zA-Z][a-zA-Z]+(?=[,. ]|$)/g, (m) => SKILL_NAME_VI[m] || m);
 }
 
