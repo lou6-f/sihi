@@ -16,22 +16,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "FPT TTS chưa được cấu hình" }, { status: 503 });
   }
 
-  const { text } = await req.json();
+  const { text, voice } = await req.json();
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return NextResponse.json({ error: "text rỗng" }, { status: 400 });
   }
 
-  // Giới hạn độ dài (FPT giới hạn ~5000 ký tự/request)
   const trimmed = text.trim().slice(0, 2000);
-  const voice = process.env.FPT_TTS_VOICE ?? "banmai";
+  // Ưu tiên: voice từ client → FPT_TTS_VOICE từ env → "banmai"
+  const selectedVoice = (typeof voice === "string" && voice) ? voice
+    : (process.env.FPT_TTS_VOICE ?? "banmai");
 
   try {
     const fptRes = await fetch(FPT_TTS_URL, {
       method: "POST",
       headers: {
         "api-key": apiKey,
-        "voice": voice,
-        "speed": "",            // để trống = tốc độ mặc định
+        "voice": selectedVoice,
+        "speed": "",
         "Content-Type": "application/json",
       },
       body: trimmed,

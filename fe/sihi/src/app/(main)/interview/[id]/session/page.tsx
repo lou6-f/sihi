@@ -12,7 +12,7 @@ import {
   AlertCircle, Mic, MicOff, Volume2, VolumeX, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useTextToSpeech } from "@/hooks/use-text-to-speech";
+import { useTextToSpeech, FPT_VOICES } from "@/hooks/use-text-to-speech";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useInterviewGuard } from "@/contexts/interview-guard-context";
 import {
@@ -170,6 +170,7 @@ export default function InterviewSessionPage() {
   // ─── TTS Hook ──────────────────────────────────────────────────────────────
   const { isSpeaking, supported: ttsSupported, speak, stop: stopSpeaking,
     viVoices, enVoices, selectedVoice, setSelectedVoice,
+    fptVoices, selectedFptVoice, setSelectedFptVoice,
   } = useTextToSpeech({
     lang: "vi-VN",
     rate: 1.0,
@@ -550,14 +551,27 @@ export default function InterviewSessionPage() {
         <div className="flex items-center gap-2">
           <Badge variant="outline">Câu {questionNum}/{interview?.maxQuestions}</Badge>
 
-          {/* Voice selector */}
-          {ttsSupported && ttsEnabled && (viVoices.length + enVoices.length) > 1 && (
+          {/* Voice selector — hiện cả browser lẫn FPT AI */}
+          {ttsSupported && ttsEnabled && (
             <Select
-              value={selectedVoice?.name ?? ""}
-              onValueChange={(name) => {
-                const all = [...viVoices, ...enVoices];
-                const v = all.find((v) => v.name === name);
-                if (v) setSelectedVoice(v);
+              value={
+                selectedFptVoice
+                  ? `fpt:${selectedFptVoice}`
+                  : selectedVoice
+                  ? `browser:${selectedVoice.name}`
+                  : ""
+              }
+              onValueChange={(val) => {
+                if (val.startsWith("fpt:")) {
+                  const voiceId = val.slice(4) as typeof FPT_VOICES[number]["id"];
+                  setSelectedFptVoice(voiceId);
+                  setSelectedVoice(null);
+                } else if (val.startsWith("browser:")) {
+                  const name = val.slice(8);
+                  const all = [...viVoices, ...enVoices];
+                  const v = all.find((v) => v.name === name);
+                  if (v) { setSelectedVoice(v); setSelectedFptVoice(null); }
+                }
               }}
             >
               <SelectTrigger className="h-8 w-[160px] text-xs border-zinc-700 bg-zinc-900">
@@ -565,26 +579,39 @@ export default function InterviewSessionPage() {
                 <SelectValue placeholder="Chọn giọng" />
               </SelectTrigger>
               <SelectContent className="max-h-60">
-                {viVoices.length > 0 && (
+                {/* FPT AI voices — luôn hiện */}
+                <div className="px-2 py-1 text-xs text-violet-400 font-medium">🤖 FPT AI</div>
+                {fptVoices.map((v) => (
+                  <SelectItem key={v.id} value={`fpt:${v.id}`} className="text-xs">
+                    {v.label}
+                    <span className="ml-1 text-zinc-500">{v.gender} · {v.region}</span>
+                  </SelectItem>
+                ))}
+                {/* Browser voices */}
+                {(viVoices.length > 0 || enVoices.length > 0) && (
                   <>
-                    <div className="px-2 py-1 text-xs text-zinc-500 font-medium">🇻🇳 Tiếng Việt</div>
-                    {viVoices.map((v) => (
-                      <SelectItem key={v.name} value={v.name} className="text-xs">
-                        {v.name.replace(/Microsoft |Google /i, "")}
-                        {!v.localService && " ✦"}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-                {enVoices.length > 0 && (
-                  <>
-                    <div className="px-2 py-1 text-xs text-zinc-500 font-medium">🇺🇸 English</div>
-                    {enVoices.map((v) => (
-                      <SelectItem key={v.name} value={v.name} className="text-xs">
-                        {v.name.replace(/Microsoft |Google /i, "")}
-                        {!v.localService && " ✦"}
-                      </SelectItem>
-                    ))}
+                    {viVoices.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-zinc-500 font-medium mt-1">🇻🇳 Browser · Tiếng Việt</div>
+                        {viVoices.map((v) => (
+                          <SelectItem key={v.name} value={`browser:${v.name}`} className="text-xs">
+                            {v.name.replace(/Microsoft |Google /i, "")}
+                            {!v.localService && " ✦"}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {enVoices.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-zinc-500 font-medium mt-1">🇺🇸 Browser · English</div>
+                        {enVoices.map((v) => (
+                          <SelectItem key={v.name} value={`browser:${v.name}`} className="text-xs">
+                            {v.name.replace(/Microsoft |Google /i, "")}
+                            {!v.localService && " ✦"}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </>
                 )}
               </SelectContent>

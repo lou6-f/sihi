@@ -11,7 +11,21 @@ interface UseTextToSpeechOptions {
   onStart?: () => void;
 }
 
-// ─── Voice priority list (higher index = higher priority) ───────────────────
+// ─── FPT AI voices ───────────────────────────────────────────────────────────
+export const FPT_VOICES = [
+  { id: "banmai",    label: "Ban Mai",    gender: "Nữ",  region: "Bắc" },
+  { id: "leminh",   label: "Lê Minh",    gender: "Nam", region: "Bắc" },
+  { id: "thuminh",  label: "Thu Minh",   gender: "Nữ",  region: "Bắc" },
+  { id: "lannhi",   label: "Lan Nhi",    gender: "Nữ",  region: "Bắc" },
+  { id: "minhquang",label: "Minh Quang", gender: "Nam", region: "Bắc" },
+  { id: "myan",     label: "Mỹ An",      gender: "Nữ",  region: "Nam" },
+  { id: "giahuy",   label: "Gia Huy",    gender: "Nam", region: "Nam" },
+  { id: "linhsan",  label: "Linh San",   gender: "Nữ",  region: "Trung" },
+] as const;
+
+export type FptVoiceId = typeof FPT_VOICES[number]["id"];
+
+// ─── Voice priority list (higher index = higher priority) ────────────────────
 const VOICE_PRIORITY_VI = [
   "google tiếng việt",
   "google vietnamese",
@@ -37,14 +51,12 @@ function pickBestVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynt
 
   if (langVoices.length === 0) return null;
 
-  // Score each voice by priority list
   let best: SpeechSynthesisVoice | null = null;
   let bestScore = -1;
   for (const voice of langVoices) {
     const name = voice.name.toLowerCase();
     const idx = priorities.findIndex((p) => name.includes(p));
     const score = idx >= 0 ? idx : -1;
-    // Prefer remote/online voices (usually better quality)
     const qualityBonus = voice.localService ? 0 : 10;
     if (score + qualityBonus > bestScore) {
       bestScore = score + qualityBonus;
@@ -61,21 +73,13 @@ function pickBestVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynt
  */
 export function preprocessTTSText(raw: string): string {
   return raw
-    // Remove code blocks ```...```
     .replace(/```[\s\S]*?```/g, ". đoạn code.")
-    // Remove inline code `...`
     .replace(/`[^`]+`/g, (m) => m.replace(/`/g, " "))
-    // Remove markdown bold/italic **text** or *text*
     .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
-    // Remove markdown headers ### ...
     .replace(/^#{1,6}\s+/gm, "")
-    // Remove bullet points - or *
     .replace(/^\s*[-*]\s+/gm, "")
-    // Remove URLs
     .replace(/https?:\/\/\S+/g, "liên kết")
-    // Remove emoji (basic range)
     .replace(/[\u{1F300}-\u{1FFFF}]/gu, "")
-    // Collapse multiple spaces/newlines
     .replace(/\n{2,}/g, ". ")
     .replace(/\n/g, ", ")
     .replace(/\s{2,}/g, " ")
@@ -93,13 +97,16 @@ export function useTextToSpeech({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+  // FPT voice: null = dùng browser, string = dùng FPT với voice id này
+  const [selectedFptVoice, setSelectedFptVoice] = useState<FptVoiceId | null>(null);
+
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const fptAudioRef = useRef<HTMLAudioElement | null>(null);  // FPT audio element
+  const fptAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const supported =
     typeof window !== "undefined" && "speechSynthesis" in window;
 
-  // ─── Load voices (async on Chrome) ────────────────────────────────────────
+  // ─── Load browser voices (async on Chrome) ────────────────────────────────
   useEffect(() => {
     if (!supported) return;
 
@@ -107,6 +114,7 @@ export function useTextToSpeech({
       const all = window.speechSynthesis.getVoices();
       if (all.length > 0) {
         setVoices(all);
+        // Chỉ auto-set browser voice nếu chưa chọn FPT
         setSelectedVoice((prev) => prev ?? pickBestVoice(all, lang));
       }
     };
@@ -116,10 +124,9 @@ export function useTextToSpeech({
     return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
   }, [supported, lang]);
 
-  // ─── FPT TTS (fallback khi không có giọng Việt trên browser) ─────────────────────
+  // ─── FPT TTS ─────────────────────────────────────────────────────────────
   const speakFPT = useCallback(
-    async (text: string) => {
-      // Dừng audio FPT cũ nếu đang phát
+    async (text: string, voiceId?: FptVoiceId | null) => {
       if (fptAudioRef.current) {
         fptAudioRef.current.pause();
         fptAudioRef.current = null;
@@ -132,7 +139,7 @@ export function useTextToSpeech({
         const res = await fetch("/api/tts/synthesize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voice: voiceId ?? undefined }),
         });
 
         if (!res.ok) throw new Error("FPT TTS API failed");
@@ -163,58 +170,59 @@ export function useTextToSpeech({
     [volume, onEnd, onStart]
   );
 
-  // ─── Speak ───────────────────────────────────────────────────────────────────────────────
+  // ─── Speak ────────────────────────────────────────────────────────────────
   const speak = useCallback(
     (rawText: string) => {
-      if (!supported) return;
-
-      window.speechSynthesis.cancel();
-
       const text = preprocessTTSText(rawText);
       if (!text) return;
 
-      // ─ FPT fallback: dùng khi không có giọng Việt trên browser ─
+      // 1. User đã chọn FPT voice → luôn dùng FPT
+      if (selectedFptVoice) {
+        if (supported) window.speechSynthesis.cancel();
+        speakFPT(text, selectedFptVoice);
+        return;
+      }
+
+      // 2. Browser không hỗ trợ speech → dùng FPT default
+      if (!supported) {
+        speakFPT(text, null);
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+
+      // 3. Không có giọng Việt trên browser → FPT fallback tự động
       const isVI = lang.startsWith("vi");
       const currentVoices = window.speechSynthesis.getVoices();
       const hasVIVoice = currentVoices.some((v) => v.lang.startsWith("vi"));
       if (isVI && !hasVIVoice) {
-        speakFPT(text);
+        speakFPT(text, null); // dùng voice mặc định từ .env
         return;
       }
 
+      // 4. Dùng browser TTS
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
       utterance.rate = rate;
       utterance.pitch = pitch;
       utterance.volume = volume;
 
-      // Use selected voice, fallback to best available
-      const voice =
-        selectedVoice ??
-        pickBestVoice(window.speechSynthesis.getVoices(), lang);
+      const voice = selectedVoice ?? pickBestVoice(currentVoices, lang);
       if (voice) utterance.voice = voice;
 
       utterance.onstart = () => {
         setIsSpeaking(true);
         onStart?.();
       };
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        onEnd?.();
-      };
       utterance.onerror = (e) => {
-        // "interrupted" is normal when we cancel manually
         if (e.error !== "interrupted") setIsSpeaking(false);
       };
 
       utteranceRef.current = utterance;
 
-      // Chrome bug: speechSynthesis pauses after ~15s without this
+      // Chrome bug: speechSynthesis pauses after ~15s
       const keepAlive = setInterval(() => {
-        if (!window.speechSynthesis.speaking) {
-          clearInterval(keepAlive);
-          return;
-        }
+        if (!window.speechSynthesis.speaking) { clearInterval(keepAlive); return; }
         window.speechSynthesis.pause();
         window.speechSynthesis.resume();
       }, 10000);
@@ -227,14 +235,12 @@ export function useTextToSpeech({
         onEnd?.();
       };
     },
-    [supported, lang, rate, pitch, volume, selectedVoice, onEnd, onStart, speakFPT]
+    [supported, lang, rate, pitch, volume, selectedVoice, selectedFptVoice, onEnd, onStart, speakFPT]
   );
 
-  // ─── Stop ───────────────────────────────────────────────────────────────────────────────
+  // ─── Stop ─────────────────────────────────────────────────────────────────
   const stop = useCallback(() => {
-    if (!supported) return;
-    // Dừng cả browser TTS lẫn FPT audio
-    window.speechSynthesis.cancel();
+    if (supported) window.speechSynthesis.cancel();
     if (fptAudioRef.current) {
       fptAudioRef.current.pause();
       fptAudioRef.current = null;
@@ -242,7 +248,6 @@ export function useTextToSpeech({
     setIsSpeaking(false);
   }, [supported]);
 
-  // ─── Available Vietnamese voices ─────────────────────────────────────────
   const viVoices = voices.filter((v) => v.lang.startsWith("vi"));
   const enVoices = voices.filter((v) => v.lang.startsWith("en"));
 
@@ -256,5 +261,9 @@ export function useTextToSpeech({
     enVoices,
     selectedVoice,
     setSelectedVoice,
+    // FPT
+    fptVoices: FPT_VOICES,
+    selectedFptVoice,
+    setSelectedFptVoice,
   };
 }
