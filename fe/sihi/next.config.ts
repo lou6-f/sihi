@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Note: 'output: standalone' is for Docker only — removed for Vercel
   turbopack: undefined,
   images: {
     remotePatterns: [

@@ -1,98 +1,135 @@
+/**
+ * file-storage.ts
+ *
+ * Dual-mode file storage:
+ *  - LOCAL  : fs.writeFileSync — dùng khi LOCAL_STORAGE=true (dev với Docker)
+ *  - REMOTE : Supabase Storage — dùng trên Vercel / production
+ *
+ * Biến môi trường:
+ *   LOCAL_STORAGE=true   → ép dùng local fs (mặc định khi không có SUPABASE_URL)
+ *   SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY → tự động dùng Supabase Storage
+ */
+
 import fs from "fs";
 import path from "path";
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./data/uploads";
+// ─── Detect storage mode ──────────────────────────────────────────────────────
+const isLocal =
+  process.env.LOCAL_STORAGE === "true" ||
+  !process.env.SUPABASE_URL ||
+  !process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-/**
- * Đảm bảo thư mục tồn tại, tạo đệ quy nếu chưa có.
- */
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "./data/uploads";
+const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "sihi-files";
+
+// ─── Local helpers ────────────────────────────────────────────────────────────
 export function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+// ─── saveFile ─────────────────────────────────────────────────────────────────
 /**
- * Lưu file vào UPLOAD_DIR/subdir/fileName.
- * Trả về đường dẫn tương đối (subdir/fileName).
+ * Lưu file vào storage.
+ * - LOCAL  : trả về đường dẫn tương đối  (subdir/fileName)
+ * - REMOTE : trả về public URL từ Supabase Storage
  */
-export function saveFile(
+export async function saveFile(
   subdir: string,
   fileName: string,
   buffer: Buffer
-): string {
-  const targetDir = path.join(UPLOAD_DIR, subdir);
-  ensureDir(targetDir);
+): Promise<string> {
+  if (isLocal) {
+    const targetDir = path.join(UPLOAD_DIR, subdir);
+    ensureDir(targetDir);
+    const filePath = path.join(targetDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+    return path.posix.join(subdir, fileName);
+  }
 
-  const filePath = path.join(targetDir, fileName);
-  fs.writeFileSync(filePath, buffer);
+  // Supabase Storage
+  const { supabaseAdmin } = await import("./supabase");
+  const objectPath = `${subdir}/${fileName}`;
+  const { error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .upload(objectPath, buffer, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
 
-  return path.join(subdir, fileName);
+  if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);
+
+  const { data } = supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(objectPath);
+
+  return data.publicUrl;
 }
 
+// ─── readFile ─────────────────────────────────────────────────────────────────
 /**
- * Đọc file từ đường dẫn tương đối.
- * Trả về đường dẫn tuyệt đối nếu file tồn tại, null nếu không.
+ * LOCAL  : trả về absolute path nếu file tồn tại
+ * REMOTE : trả về URL (đã là public URL, không cần đọc lại)
  */
 export function readFile(relativePath: string): string | null {
-  const fullPath = getAbsolutePath(relativePath);
-  if (!fs.existsSync(fullPath)) {
-    return null;
+  if (isLocal) {
+    const fullPath = path.join(UPLOAD_DIR, relativePath);
+    return fs.existsSync(fullPath) ? fullPath : null;
   }
-  return fullPath;
+  // Với Supabase, filePath đã là public URL
+  return relativePath.startsWith("http") ? relativePath : null;
 }
 
-/**
- * Xoá file từ đường dẫn tương đối nếu tồn tại.
- */
-export function deleteFile(relativePath: string): boolean {
-  const fullPath = getAbsolutePath(relativePath);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
-    return true;
+// ─── deleteFile ───────────────────────────────────────────────────────────────
+export async function deleteFile(relativePath: string): Promise<boolean> {
+  if (isLocal) {
+    const fullPath = path.join(UPLOAD_DIR, relativePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+      return true;
+    }
+    return false;
   }
-  return false;
+
+  // Supabase Storage — relativePath là public URL, cần extract object path
+  try {
+    const { supabaseAdmin } = await import("./supabase");
+    // URL format: .../storage/v1/object/public/<bucket>/<path>
+    const urlObj = new URL(relativePath);
+    const parts = urlObj.pathname.split(`/object/public/${STORAGE_BUCKET}/`);
+    if (parts.length < 2) return false;
+    const objectPath = parts[1];
+    const { error } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .remove([objectPath]);
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Lấy đường dẫn tuyệt đối từ đường dẫn tương đối.
- */
+// ─── getAbsolutePath ──────────────────────────────────────────────────────────
+/** LOCAL only — remote trả về URL gốc */
 export function getAbsolutePath(relativePath: string): string {
-  return path.join(UPLOAD_DIR, relativePath);
+  if (isLocal) return path.join(UPLOAD_DIR, relativePath);
+  return relativePath; // already a URL
 }
 
-/**
- * Kiểm tra loại file có hợp lệ không.
- */
-export function validateFileType(
-  mimeType: string,
-  allowed: string[]
-): boolean {
+// ─── Validators (không đổi) ───────────────────────────────────────────────────
+export function validateFileType(mimeType: string, allowed: string[]): boolean {
   return allowed.includes(mimeType.toLowerCase());
 }
 
-/**
- * Kiểm tra kích thước file có hợp lệ không.
- * @param size Kích thước file tính bằng byte
- * @param maxSize Giới hạn tối đa tính bằng byte
- */
 export function validateFileSize(size: number, maxSize: number): boolean {
   return size > 0 && size <= maxSize;
 }
 
-/**
- * Làm sạch tên file: loại bỏ ký tự đặc biệt, thêm timestamp prefix.
- */
 export function sanitizeFileName(name: string): string {
-  // Lấy phần extension
   const ext = path.extname(name);
   const baseName = path.basename(name, ext);
-
-  // Loại bỏ ký tự đặc biệt, chỉ giữ chữ cái, số, dấu gạch ngang, gạch dưới
   const sanitized = baseName
     .replace(/[^a-zA-Z0-9\-_]/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .substring(0, 100);
-
-  const timestamp = Date.now();
-  return `${timestamp}_${sanitized}${ext.toLowerCase()}`;
+  return `${Date.now()}_${sanitized}${ext.toLowerCase()}`;
 }
