@@ -88,6 +88,7 @@ export default function InterviewSessionPage() {
   const [showInactivityDialog, setShowInactivityDialog] = useState(false);
   const [finishing, setFinishing] = useState(false); // loading khi kết thúc sớm
   const [isReadonly, setIsReadonly] = useState(false); // true khi xem lại buổi đã hoàn thành
+  const [isInitializing, setIsInitializing] = useState(false); // true chỉ khi đang gọi startInterview()
   const interviewActiveRef = useRef(false);
   const isCompletedRef = useRef(false);
   const { setIsInInterview } = useInterviewGuard();
@@ -220,12 +221,14 @@ export default function InterviewSessionPage() {
   // ─── Load interview ────────────────────────────────────────────────────────
   const startInterview = useCallback(async () => {
     setAiThinking(true);
+    setIsInitializing(true); // bật full animation
     try {
       const res = await fetch(`/api/interviews/${id}/start`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || "Không thể bắt đầu phỏng vấn");
         setAiThinking(false);
+        setIsInitializing(false);
         return;
       }
       const data = await res.json();
@@ -242,6 +245,7 @@ export default function InterviewSessionPage() {
     } catch {
       toast.error("Lỗi kết nối. Vui lòng thử lại.");
     }
+    setIsInitializing(false);
     setAiThinking(false);
   }, [id]);
 
@@ -470,7 +474,15 @@ export default function InterviewSessionPage() {
     </div>
   );
 
-  if (loading) return (
+  // Chỉ load data (bao gồm readonly) → spinner nhỏ, không animation phức tạp
+  if (loading && !isInitializing) return (
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
+    </div>
+  );
+
+  // Đang khởi tạo phỏng vấn mới → full animation "AI đang kết nối"
+  if (loading && isInitializing) return (
     <div className="flex items-center justify-center min-h-[70vh]">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
