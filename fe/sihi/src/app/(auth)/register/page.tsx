@@ -22,7 +22,9 @@ function validateName(v: string) {
 
 function validateEmail(v: string) {
   if (!v) return "Vui lòng nhập email";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Email không hợp lệ (ví dụ: you@gmail.com)";
+  // Yêu cầu: có @, domain hợp lệ, đuôi (TLD) ít nhất 2 ký tự
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v))
+    return "Email không hợp lệ — ví dụ: you@gmail.com";
   return "";
 }
 
@@ -150,7 +152,7 @@ export default function RegisterPage() {
                   id="email"
                   type="email"
                   autoComplete="off"
-                  placeholder="you@example.com"
+                  placeholder="you@gmail.com"
                   value={form.email}
                   onChange={set("email")}
                   onBlur={touch("email")}

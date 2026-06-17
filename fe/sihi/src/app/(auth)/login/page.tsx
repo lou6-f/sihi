@@ -72,7 +72,7 @@ export default function LoginPage() {
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
-                  id="email" type="email" placeholder="you@example.com"
+                  id="email" type="email" placeholder="you@gmail.com"
                   autoComplete="off"
                   value={email} onChange={(e) => setEmail(e.target.value)}
                   className="pl-10" required
