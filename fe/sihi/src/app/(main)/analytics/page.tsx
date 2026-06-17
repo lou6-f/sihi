@@ -245,10 +245,29 @@ export default function AnalyticsPage() {
     </div>
   );
 
-  const sorted = [...skills].sort((a, b) => b.currentScore - a.currentScore);
-  const median = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)].currentScore : 50;
-  const topSkills = sorted.filter(s => s.currentScore >= median).slice(0, 5);
-  const weakSkills = [...sorted].reverse().slice(0, 5);
+  // Chỉ dùng dim_ skills (8 chiều đánh giá chuẩn)
+  const dimSkills = [...skills]
+    .filter(s => s.skillName.startsWith("dim_"))
+    .sort((a, b) => b.currentScore - a.currentScore);
+
+  // Điểm trung bình để phân chia
+  const avgScore = dimSkills.length > 0
+    ? dimSkills.reduce((sum, s) => sum + s.currentScore, 0) / dimSkills.length
+    : 50;
+
+  // Top: điểm TRÊN trung bình, tối đa 4 kỹ năng
+  const topSkills = dimSkills.filter(s => s.currentScore > avgScore).slice(0, 4);
+
+  // Weak: điểm DƯỚI trung bình, loại các kỹ năng đã có trong top, tối đa 4
+  const topIds = new Set(topSkills.map(s => s.id));
+  const weakSkills = [...dimSkills]
+    .reverse()
+    .filter(s => !topIds.has(s.id) && s.currentScore < avgScore)
+    .slice(0, 4);
+
+  // Kiểm tra variance: nếu tất cả cùng điểm → không phân biệt được
+  const hasVariance = dimSkills.length > 0 &&
+    (dimSkills[0].currentScore - dimSkills[dimSkills.length - 1].currentScore) >= 5;
 
   // Build chart data: oldest → newest
   const chartData = [...history]
@@ -332,37 +351,51 @@ export default function AnalyticsPage() {
       )}
 
       {/* ── Skills Grid ── */}
+      {dimSkills.length > 0 && (
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Top skills */}
+        {/* Top / All skills */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <Card className="glass border-0 h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl text-green-400">
-                <TrendingUp className="h-6 w-6" />Kỹ năng tốt nhất
+                <TrendingUp className="h-6 w-6" />
+                {hasVariance ? "Kỹ năng tốt nhất" : "Tổng quan kỹ năng"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {topSkills.length > 0 ? topSkills.map((s) => (
-                <div key={s.id}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">{formatSkillName(s.skillName)}</span>
-                    <span className="font-bold text-green-400">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
+              {!hasVariance ? (
+                // Điểm tương đương — hiện top 4 theo thứ tự, màu trung tính
+                dimSkills.slice(0, 4).map((s) => (
+                  <div key={s.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">{formatSkillName(s.skillName)}</span>
+                      <span className="font-bold text-zinc-300">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-zinc-800">
+                      <div className="h-2.5 rounded-full bg-zinc-600 transition-all" style={{ width: `${Math.max(s.currentScore, 2)}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2.5 w-full rounded-full bg-zinc-800">
-                    <div
-                      className="h-2.5 rounded-full bg-gradient-to-r from-green-600 to-green-400 transition-all"
-                      style={{ width: `${s.currentScore}%` }}
-                    />
+                ))
+              ) : topSkills.length > 0 ? (
+                topSkills.map((s) => (
+                  <div key={s.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">{formatSkillName(s.skillName)}</span>
+                      <span className="font-bold text-green-400">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-zinc-800">
+                      <div className="h-2.5 rounded-full bg-gradient-to-r from-green-600 to-green-400 transition-all" style={{ width: `${s.currentScore}%` }} />
+                    </div>
                   </div>
-                </div>
-              )) : (
+                ))
+              ) : (
                 <p className="text-zinc-500">Hoàn thành thêm phỏng vấn để xem kỹ năng nổi bật.</p>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Weak skills */}
+        {/* Weak skills — chỉ hiện khi có variance rõ */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           <Card className="glass border-0 h-full">
             <CardHeader>
@@ -371,26 +404,43 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {weakSkills.length > 0 ? weakSkills.map((s) => (
-                <div key={s.id}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">{formatSkillName(s.skillName)}</span>
-                    <span className="font-bold text-red-400">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-zinc-800">
-                    <div
-                      className="h-2.5 rounded-full bg-gradient-to-r from-red-600 to-red-400 transition-all"
-                      style={{ width: `${Math.max(s.currentScore, 2)}%` }}
-                    />
-                  </div>
+              {!hasVariance ? (
+                // Chưa đủ dữ liệu để phân biệt
+                <div className="space-y-2">
+                  <p className="text-zinc-400 text-sm">Các kỹ năng đang ở mức tương đương nhau.</p>
+                  <p className="text-zinc-500 text-sm">Hoàn thành thêm phỏng vấn để AI xác định điểm cần cải thiện.</p>
+                  {dimSkills.slice(4).map((s) => (
+                    <div key={s.id}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{formatSkillName(s.skillName)}</span>
+                        <span className="font-bold text-zinc-300">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
+                      </div>
+                      <div className="h-2.5 w-full rounded-full bg-zinc-800">
+                        <div className="h-2.5 rounded-full bg-zinc-600 transition-all" style={{ width: `${Math.max(s.currentScore, 2)}%` }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )) : (
+              ) : weakSkills.length > 0 ? (
+                weakSkills.map((s) => (
+                  <div key={s.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">{formatSkillName(s.skillName)}</span>
+                      <span className="font-bold text-red-400">{Math.round(s.currentScore)}<span className="text-xs text-zinc-500">/100</span></span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-zinc-800">
+                      <div className="h-2.5 rounded-full bg-gradient-to-r from-red-600 to-red-400 transition-all" style={{ width: `${Math.max(s.currentScore, 2)}%` }} />
+                    </div>
+                  </div>
+                ))
+              ) : (
                 <p className="text-zinc-500">Chưa có dữ liệu</p>
               )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
+      )}
     </div>
   );
 }
