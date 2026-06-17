@@ -24,14 +24,24 @@ export async function GET(
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  const absolutePath = readFile(relativePath);
-  if (!absolutePath || !fs.existsSync(absolutePath)) {
+  const filePathOrUrl = readFile(relativePath);
+  if (!filePathOrUrl) {
     return new NextResponse("Not Found", { status: 404 });
   }
 
-  const ext = path.extname(absolutePath).toLowerCase();
+  // Supabase Storage — redirect về public URL
+  if (filePathOrUrl.startsWith("http")) {
+    return NextResponse.redirect(filePathOrUrl, { status: 302 });
+  }
+
+  // Local filesystem
+  if (!fs.existsSync(filePathOrUrl)) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
+  const ext = path.extname(filePathOrUrl).toLowerCase();
   const mimeType = MIME[ext] || "application/octet-stream";
-  const buffer = fs.readFileSync(absolutePath);
+  const buffer = fs.readFileSync(filePathOrUrl);
 
   return new NextResponse(buffer, {
     headers: {

@@ -30,7 +30,7 @@ export async function PUT(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileName = sanitizeFileName(file.name);
-    const relativePath = saveFile("avatars", fileName, buffer);
+    const relativePath = await saveFile("avatars", fileName, buffer);
 
     // Xoá avatar cũ nếu có
     const user = await prisma.user.findUnique({
