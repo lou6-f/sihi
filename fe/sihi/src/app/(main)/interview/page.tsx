@@ -233,8 +233,8 @@ export default function InterviewSetupPage() {
                     : "border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:border-zinc-600"
                 }`}
               >
-                <span className="text-sm font-semibold">{l.label}</span>
-                <span className="text-[10px] text-zinc-500 mt-0.5 text-center leading-tight">{l.desc}</span>
+                <span className="text-base font-semibold">{l.label}</span>
+                <span className="text-xs text-zinc-500 mt-0.5 text-center leading-tight">{l.desc}</span>
               </button>
             ))}
           </div>
