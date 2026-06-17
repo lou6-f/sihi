@@ -7,14 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { toast } from "sonner";
 import {
   Users,
@@ -328,61 +321,84 @@ export default function AdminStatsPage() {
                 Tổng hợp nhanh
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="text-zinc-400">Chỉ số</TableHead>
-                    <TableHead className="text-right text-zinc-400">
-                      Giá trị
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow className="border-zinc-800/50 hover:bg-zinc-800/30">
-                    <TableCell className="text-zinc-300">
-                      Tỉ lệ hoàn thành phỏng vấn
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      <Badge className="bg-cyan-500/20 text-cyan-400">
-                        {stats.totalInterviews > 0
-                          ? Math.round(
-                              (stats.completedInterviews /
-                                stats.totalInterviews) *
-                                100
-                            )
-                          : 0}
-                        %
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+            <CardContent className="space-y-3">
+              {(() => {
+                const completionRate =
+                  stats.totalInterviews > 0
+                    ? Math.round(
+                        (stats.completedInterviews / stats.totalInterviews) * 100
+                      )
+                    : 0;
+                const activeRate =
+                  stats.totalUsers > 0
+                    ? Math.round((stats.activeUsers / stats.totalUsers) * 100)
+                    : 0;
 
-                  <TableRow className="border-zinc-800/50 hover:bg-zinc-800/30">
-                    <TableCell className="text-zinc-300">
-                      Tỉ lệ người dùng hoạt động
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      <Badge
-                        className={
-                          stats.totalUsers > 0 &&
-                          (stats.activeUsers / stats.totalUsers) * 100 >= 50
-                            ? "bg-green-500/20 text-green-400"
-                            : "bg-yellow-500/20 text-yellow-400"
-                        }
-                      >
-                        {stats.totalUsers > 0
-                          ? Math.round(
-                              (stats.activeUsers / stats.totalUsers) * 100
-                            )
-                          : 0}
-                        %
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                const rows = [
+                  {
+                    label: "Hoàn thành PV",
+                    value: stats.completedInterviews,
+                    pct: completionRate,
+                    gradient: "from-cyan-500 to-cyan-400",
+                    badgeBg: "bg-cyan-500/20 text-cyan-300",
+                  },
+                  {
+                    label: "Người dùng HĐ",
+                    value: stats.activeUsers,
+                    pct: activeRate,
+                    gradient:
+                      activeRate >= 50
+                        ? "from-green-500 to-emerald-400"
+                        : "from-yellow-500 to-amber-400",
+                    badgeBg:
+                      activeRate >= 50
+                        ? "bg-green-500/20 text-green-300"
+                        : "bg-yellow-500/20 text-yellow-300",
+                  },
+                ];
+
+                return rows.map((row, idx) => (
+                  <motion.div
+                    key={row.label}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 + 0.75 }}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-32 flex-shrink-0">
+                        <Badge className={`${row.badgeBg} text-xs`}>
+                          {row.label}
+                        </Badge>
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-8 overflow-hidden rounded-lg bg-zinc-800/60">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${row.pct}%` }}
+                            transition={{
+                              duration: 0.8,
+                              delay: idx * 0.1 + 0.85,
+                              ease: "easeOut",
+                            }}
+                            className={`flex h-full items-center rounded-lg bg-gradient-to-r ${row.gradient} px-3`}
+                            style={{ minWidth: row.pct > 5 ? undefined : "40px" }}
+                          >
+                            <span className="text-xs font-semibold text-white drop-shadow">
+                              {row.value}
+                            </span>
+                          </motion.div>
+                        </div>
+                      </div>
+                      <div className="w-12 text-right text-sm font-medium text-zinc-400">
+                        {row.pct}%
+                      </div>
+                    </div>
+                  </motion.div>
+                ));
+              })()}
             </CardContent>
           </Card>
+
         </motion.div>
       )}
     </div>
