@@ -236,32 +236,46 @@ export class ReportGenerationService {
       await this.prisma.interviewScoreBreakdown.createMany({ data: breakdownData });
     }
 
-    // 9. Update skills (analytics) — include all 6 dimensions
+    // 9. Update skills (analytics) — chỉ dùng dim_ keys (8 chiều chuẩn)
     if (this.analyticsEngine) {
       const skillScores: Record<string, number> = {};
 
-      // Add criteria scores
-      if (evaluation.criteriaScores) {
-        Object.entries(evaluation.criteriaScores as Record<string, { score: number }>).forEach(
-          ([k, v]) => { skillScores[k] = v.score; }
-        );
-      }
-
-      // Add dimension scores  
+      // 4 chiều phỏng vấn cốt lõi (dimensionScores)
+      // v là { score, comment, reason } → phải lấy v.score, KHÔNG gán cả object
       if (dimensionScores) {
-        Object.entries(dimensionScores).forEach(([k, v]) => { skillScores[`dim_${k}`] = v; });
+        Object.entries(dimensionScores).forEach(([k, v]) => {
+          const score = typeof v === "object" && v !== null && "score" in v
+            ? (v as { score: number }).score
+            : Number(v);
+          if (!isNaN(score)) skillScores[`dim_${k}`] = score;
+        });
       }
 
-      await this.analyticsEngine.updateSkills({
-        userId: interview.userId,
-        interviewId: input.interviewId,
-        criteriaScores: skillScores,
-      });
+      // 4 chiều năng lực (competencyProfile)
+      if (competencyProfile) {
+        Object.entries(competencyProfile).forEach(([k, v]) => {
+          const score = typeof v === "object" && v !== null && "score" in v
+            ? (v as { score: number }).score
+            : Number(v);
+          if (!isNaN(score)) skillScores[`dim_${k}`] = score;
+        });
+      }
 
-      await this.analyticsEngine.createProgressSnapshot({
-        userId: interview.userId,
-        interviewId: input.interviewId,
-      });
+      // Chỉ update nếu có ít nhất 1 chiều hợp lệ
+      if (Object.keys(skillScores).length > 0) {
+        await this.analyticsEngine.updateSkills({
+          userId: interview.userId,
+          interviewId: input.interviewId,
+          criteriaScores: skillScores,
+        });
+
+        await this.analyticsEngine.createProgressSnapshot({
+          userId: interview.userId,
+          interviewId: input.interviewId,
+        });
+      } else {
+        console.warn("[Report] Không có dim_ scores hợp lệ — bỏ qua analytics update");
+      }
     }
 
     // 10. Resource recommendations

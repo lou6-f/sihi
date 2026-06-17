@@ -98,14 +98,33 @@ export class AnalyticsEngineService {
       orderBy: { currentScore: "desc" },
     });
 
-    // Calculate overall score (average of all skills)
-    const overallScore =
-      skills.length > 0
-        ? Math.round(
-            skills.reduce((sum, s) => sum + s.currentScore, 0) /
-              skills.length
-          )
-        : 0;
+    // Tính điểm tổng — chỉ dùng dim_ skills, trọng số cho 4 chiều cốt lõi
+    const WEIGHTS: Record<string, number> = {
+      dim_technicalKnowledge:  0.35,
+      dim_problemSolving:      0.30,
+      dim_practicalExperience: 0.20,
+      dim_communication:       0.15,
+    };
+
+    const dimSkills = skills.filter(s => s.skillName.startsWith("dim_"));
+
+    let overallScore: number;
+    if (dimSkills.length === 0) {
+      overallScore = 0;
+    } else {
+      // Có đủ 4 chiều cốt lõi → dùng trọng số
+      const coreSkills = dimSkills.filter(s => s.skillName in WEIGHTS);
+      if (coreSkills.length === 4) {
+        overallScore = Math.round(
+          coreSkills.reduce((sum, s) => sum + s.currentScore * (WEIGHTS[s.skillName] ?? 0), 0)
+        );
+      } else {
+        // Chưa đủ 4 chiều (mới có 1-2 buổi) → trung bình giản
+        overallScore = Math.round(
+          dimSkills.reduce((sum, s) => sum + s.currentScore, 0) / dimSkills.length
+        );
+      }
+    }
 
     // Determine readiness level
     const readinessLevel = this.calculateReadiness(overallScore);

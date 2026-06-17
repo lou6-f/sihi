@@ -40,31 +40,18 @@ const READINESS_LABELS: Record<string, string> = {
   NOT_READY: "Chưa sẵn sàng",
 };
 
-// ALL possible skill keys → Vietnamese
+// Tất cả 8 chiều đánh giá chuẩn (dim_ prefix)
 const SKILL_LABELS: Record<string, string> = {
-  // Dimension scores (dim_ prefix)
-  dim_technicalKnowledge: "Kiến thức kỹ thuật",
-  dim_reasoningAbility: "Khả năng suy luận",
-  dim_projectExperience: "Kinh nghiệm dự án",
-  dim_communication: "Giao tiếp",
-  dim_learningAbility: "Khả năng học hỏi",
-  dim_confidence: "Tự tin",
-  // Rubric criteria (snake_case)
-  technical_knowledge: "Kiến thức kỹ thuật",
-  problem_solving: "Giải quyết vấn đề",
-  communication: "Giao tiếp",
-  practical_experience: "Kinh nghiệm thực tế",
-  // Additional rubric variants
-  algorithm: "Thuật toán",
-  system_design: "Thiết kế hệ thống",
-  behavioral: "Kỹ năng mềm",
-  project_experience: "Kinh nghiệm dự án",
-  // Raw camelCase variants (no prefix)
-  technicalKnowledge: "Kiến thức kỹ thuật",
-  reasoningAbility: "Khả năng suy luận",
-  projectExperience: "Kinh nghiệm dự án",
-  learningAbility: "Khả năng học hỏi",
-  confidence: "Tự tin",
+  // 4 chiều phỏng vấn cốt lõi (dimensionScores)
+  dim_technicalKnowledge:  "Kiến thức kỹ thuật",
+  dim_problemSolving:      "Tư duy giải quyết vấn đề",
+  dim_practicalExperience: "Kinh nghiệm thực tế",
+  dim_communication:       "Giao tiếp & trình bày",
+  // 4 chiều năng lực (competencyProfile)
+  dim_learningAbility:     "Khả năng học hỏi",
+  dim_confidence:          "Tự tin",
+  dim_teamwork:            "Làm việc nhóm",
+  dim_initiative:          "Tinh thần chủ động",
 };
 
 function formatSkillName(raw: string): string {
