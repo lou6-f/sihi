@@ -431,6 +431,23 @@ export default function InterviewSessionPage() {
     }
   };
 
+  // ─── Thoát và không lưu — xóa toàn bộ dữ liệu buổi phỏng vấn ──────────────
+  const handleDiscard = async () => {
+    setShowExitModal(false);
+    interviewActiveRef.current = false;
+    setIsInInterview(false);
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    stopSpeaking();
+    if (isListening) stopListening();
+
+    try {
+      await fetch(`/api/interviews/${id}`, { method: "DELETE" });
+    } catch {
+      // Nếu xóa thất bại vẫn chuyển trang
+    }
+    router.push("/interview");
+  };
+
   // Tầng 2 handlers — InactivityDialog
   const handleEndEarly = async () => {
     setShowInactivityDialog(false);
@@ -902,19 +919,30 @@ export default function InterviewSessionPage() {
                     Tiến trình phỏng vấn sẽ được lưu lại và AI sẽ tạo báo cáo đánh giá cho bạn.
                   </p>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col gap-2 pt-2">
+                  {/* Hàng 1: 2 nút chính */}
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-zinc-700"
+                      onClick={() => setShowExitModal(false)}
+                    >
+                      Tiếp tục phỏng vấn
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                    onClick={async () => { setShowExitModal(false); await doEnd(); }}
+                    >
+                      Kết thúc &amp; Xem báo cáo
+                    </Button>
+                  </div>
+                  {/* Hàng 2: Thoát không lưu */}
                   <Button
-                    variant="outline"
-                    className="flex-1 border-zinc-700"
-                    onClick={() => setShowExitModal(false)}
+                    variant="ghost"
+                    className="w-full text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 text-sm"
+                    onClick={handleDiscard}
                   >
-                    Tiếp tục phỏng vấn
-                  </Button>
-                  <Button
-                    className="flex-1 bg-red-600 hover:bg-red-700"
-                  onClick={async () => { setShowExitModal(false); await doEnd(); }}
-                  >
-                    Kết thúc &amp; Xem báo cáo
+                    🗑️ Thoát và không lưu
                   </Button>
                 </div>
               </div>
