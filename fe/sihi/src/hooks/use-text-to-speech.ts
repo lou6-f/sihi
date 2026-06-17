@@ -94,6 +94,7 @@ export function useTextToSpeech({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const fptAudioRef = useRef<HTMLAudioElement | null>(null);  // FPT audio element
 
   const supported =
     typeof window !== "undefined" && "speechSynthesis" in window;
@@ -115,7 +116,54 @@ export function useTextToSpeech({
     return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
   }, [supported, lang]);
 
-  // ─── Speak ────────────────────────────────────────────────────────────────
+  // ─── FPT TTS (fallback khi không có giọng Việt trên browser) ─────────────────────
+  const speakFPT = useCallback(
+    async (text: string) => {
+      // Dừng audio FPT cũ nếu đang phát
+      if (fptAudioRef.current) {
+        fptAudioRef.current.pause();
+        fptAudioRef.current = null;
+      }
+
+      setIsSpeaking(true);
+      onStart?.();
+
+      try {
+        const res = await fetch("/api/tts/synthesize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!res.ok) throw new Error("FPT TTS API failed");
+
+        const { url } = await res.json();
+        const audio = new Audio(url);
+        audio.volume = volume;
+        fptAudioRef.current = audio;
+
+        audio.onended = () => {
+          setIsSpeaking(false);
+          fptAudioRef.current = null;
+          onEnd?.();
+        };
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          fptAudioRef.current = null;
+          onEnd?.();
+        };
+
+        await audio.play();
+      } catch (err) {
+        console.warn("[FPT TTS] Lỗi:", err);
+        setIsSpeaking(false);
+        onEnd?.();
+      }
+    },
+    [volume, onEnd, onStart]
+  );
+
+  // ─── Speak ───────────────────────────────────────────────────────────────────────────────
   const speak = useCallback(
     (rawText: string) => {
       if (!supported) return;
@@ -124,6 +172,15 @@ export function useTextToSpeech({
 
       const text = preprocessTTSText(rawText);
       if (!text) return;
+
+      // ─ FPT fallback: dùng khi không có giọng Việt trên browser ─
+      const isVI = lang.startsWith("vi");
+      const currentVoices = window.speechSynthesis.getVoices();
+      const hasVIVoice = currentVoices.some((v) => v.lang.startsWith("vi"));
+      if (isVI && !hasVIVoice) {
+        speakFPT(text);
+        return;
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
@@ -170,13 +227,18 @@ export function useTextToSpeech({
         onEnd?.();
       };
     },
-    [supported, lang, rate, pitch, volume, selectedVoice, onEnd, onStart]
+    [supported, lang, rate, pitch, volume, selectedVoice, onEnd, onStart, speakFPT]
   );
 
-  // ─── Stop ─────────────────────────────────────────────────────────────────
+  // ─── Stop ───────────────────────────────────────────────────────────────────────────────
   const stop = useCallback(() => {
     if (!supported) return;
+    // Dừng cả browser TTS lẫn FPT audio
     window.speechSynthesis.cancel();
+    if (fptAudioRef.current) {
+      fptAudioRef.current.pause();
+      fptAudioRef.current = null;
+    }
     setIsSpeaking(false);
   }, [supported]);
 
