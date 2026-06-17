@@ -176,6 +176,17 @@ export class ReportGenerationService {
       ) : (evaluation.overallScore as number ?? 0);
     }
 
+    // 8b. Áp dụng qualityMultiplier từ answerQualityAudit
+    // Gemini tự chấm mức độ liên quan + nỗ lực → nhân vào điểm để phạt câu trả lời vô nghĩa
+    const qualityAudit = evaluation.answerQualityAudit as
+      { avgRelevanceScore?: number; avgEffortScore?: number; qualityMultiplier?: number } | undefined;
+    const rawMultiplier = qualityAudit?.qualityMultiplier;
+    const qualityMultiplier = typeof rawMultiplier === "number"
+      ? Math.min(1.0, Math.max(0.0, rawMultiplier))
+      : 1.0; // fallback: không penalty nếu AI không trả về field này
+    calcOverallScore = Math.round(calcOverallScore * qualityMultiplier);
+    console.log(`[Report] QualityAudit: relevance=${qualityAudit?.avgRelevanceScore ?? "N/A"}, effort=${qualityAudit?.avgEffortScore ?? "N/A"}, multiplier=${qualityMultiplier} → finalScore=${calcOverallScore}`);
+
     const competencyProfile = evaluation.competencyProfile as Record<string, { score: number; comment: string }> | undefined;
 
     // 7. Create/update report in DB with all advanced fields

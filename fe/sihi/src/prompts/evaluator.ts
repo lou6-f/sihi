@@ -174,6 +174,22 @@ CÔNG THỨC TÍNH overallScore:
 overallScore = technicalKnowledge×0.35 + problemSolving×0.30 + practicalExperience×0.20 + communication×0.15
 Tính điểm tổng theo công thức này, KHÔNG tự ý tính theo cách khác.
 
+ĐÁNH GIÁ CHẤT LƯỢNG CÂU TRẢ LỜI (answerQualityAudit) — BẮT BUỘC:
+Sau khi chấm từng chiều, đánh giá tổng hợp toàn bộ câu trả lời của USER:
+- avgRelevanceScore (0.0-1.0): trung bình mức độ LIÊN QUAN của tất cả câu trả lời với câu hỏi tương ứng.
+  - 1.0 = tất cả câu trả lời đều đúng chủ đề
+  - 0.0 = toàn bộ câu trả lời vô nghĩa / không liên quan
+- avgEffortScore (0.0-1.0): trung bình mức độ NỖ LỰC của ứng viên (dù sai).
+  - 1.0 = giải thích rõ ràng, cấu trúc tốt
+  - 0.0 = im lặng hoàn toàn, 1 từ vô nghĩa
+- qualityMultiplier (0.0-1.0): = avgRelevanceScore × sqrt(avgEffortScore), làm tròn 2 chữ số thập phân
+
+Ví dụ qualityMultiplier:
+- Tất cả trả lời tốt → relevance=0.9, effort=0.9 → multiplier=0.85
+- Không biết nhưng cố giải thích → relevance=0.6, effort=0.7 → multiplier=0.50
+- 1 từ vô nghĩa mọi câu → relevance=0.0, effort=0.05 → multiplier=0.00
+- Im lặng hoàn toàn → relevance=0.0, effort=0.0 → multiplier=0.00
+
 Trả về JSON (không có text ngoài JSON):
 {
   "overallScore": number,  // Tính theo công thức trên, làm tròn số nguyên
@@ -231,7 +247,12 @@ Trả về JSON (không có text ngoài JSON):
   "overallComment": "nhận xét tổng quan 2-3 câu về ứng viên",
   "strengths": ["điểm mạnh 1", "điểm mạnh 2", "điểm mạnh 3"],
   "weaknesses": ["điểm yếu 1", "điểm yếu 2", "điểm yếu 3"],
-  "readinessLevel": "NOT_READY|NEEDS_PRACTICE|GOOD|READY|EXCELLENT"
+  "readinessLevel": "NOT_READY|NEEDS_PRACTICE|GOOD|READY|EXCELLENT",
+  "answerQualityAudit": {
+    "avgRelevanceScore": 0.0,
+    "avgEffortScore": 0.0,
+    "qualityMultiplier": 0.0
+  }
 }`,
     },
     {

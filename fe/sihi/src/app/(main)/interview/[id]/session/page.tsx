@@ -86,6 +86,7 @@ export default function InterviewSessionPage() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [showInactivityDialog, setShowInactivityDialog] = useState(false);
   const [finishing, setFinishing] = useState(false); // loading khi kết thúc sớm
+  const [isReadonly, setIsReadonly] = useState(false); // true khi xem lại buổi đã hoàn thành
   const interviewActiveRef = useRef(false);
   const isCompletedRef = useRef(false);
   const { setIsInInterview } = useInterviewGuard();
@@ -258,6 +259,13 @@ export default function InterviewSessionPage() {
             .filter((m: Message) => m.role === "AI" && m.questionNumber)
             .pop();
           setQuestionNum(lastQ?.questionNumber || 0);
+        }
+
+        if (ivData.status === "COMPLETED") {
+          // Buổi đã kết thúc → hiển thị chế độ xem lại (readonly), không kích hoạt timer
+          setIsReadonly(true);
+          setLoading(false);
+          return;
         }
 
         if (ivData.status === "CREATED" || ivData.questionCount === 0) {
@@ -679,8 +687,7 @@ export default function InterviewSessionPage() {
                 {msg.role === "AI" && msg.questionNumber && (
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <Badge variant="secondary" className="text-xs">Câu {msg.questionNumber}</Badge>
-                    {msg.category && <Badge variant="outline" className="text-xs">{msg.category}</Badge>}
-                    {msg.action && msg.action !== "ASK_NEW_QUESTION" && (
+                {msg.action && msg.action !== "ASK_NEW_QUESTION" && (
                       <Badge className="text-xs bg-violet-500/20 text-violet-300">
                         {ACTION_LABELS[msg.action] ?? msg.action}
                       </Badge>
@@ -748,88 +755,106 @@ export default function InterviewSessionPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Input area ───────────────────────────────────────────────────── */}
-      <div className="pt-4 border-t border-zinc-800 mt-4 space-y-2">
-
-        {/* Live transcript badge when listening */}
-        <AnimatePresence>
-          {isListening && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30"
+      {/* ── Input area OR Readonly banner ─────────────────────────────── */}
+      {isReadonly ? (
+        /* ── READONLY: buổi đã kết thúc, chỉ xem lại ── */
+        <div className="pt-4 border-t border-zinc-800 mt-4">
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-800/60 border border-zinc-700">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <span className="h-2 w-2 rounded-full bg-zinc-500" />
+              <span>Buổi phỏng vấn đã kết thúc — đang xem lại</span>
+            </div>
+            <Link
+              href={`/interview/${id}/report`}
+              className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2 transition-colors"
             >
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs text-red-400">Đang ghi âm...</span>
-              {transcript && (
-                <span className="text-xs text-zinc-300 truncate max-w-[60%]">{transcript}</span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="flex gap-2">
-          {/* Microphone button */}
-          {sttSupported && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleMicToggle}
-              disabled={sending || aiThinking}
-              title={isListening ? "Dừng ghi âm" : "Bắt đầu ghi âm"}
-              className={`shrink-0 transition-all ${
-                isListening
-                  ? "border-red-500 bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 animate-pulse"
-                  : "border-zinc-700 text-zinc-400 hover:border-violet-500 hover:text-violet-400"
-              }`}
-            >
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-          )}
-
-          {/* Text input */}
-          <Textarea
-            ref={textareaRef}
-            placeholder={
-              isListening
-                ? "Đang lắng nghe... (nhấn dừng hoặc gõ thêm)"
-                : sttSupported
-                ? "Gõ hoặc nhấn 🎙️ để nói... (Enter gửi, Shift+Enter xuống dòng)"
-                : "Nhập câu trả lời của bạn..."
-            }
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              if (!recordingStartRef.current && e.target.value.length === 1) {
-                recordingStartRef.current = Date.now();
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-            }}
-            className="min-h-[60px] max-h-[160px] resize-none"
-            disabled={sending || aiThinking}
-          />
-
-          {/* Send button */}
-          <Button
-            onClick={handleSend}
-            disabled={sending || aiThinking || !input.trim()}
-            className="bg-violet-600 hover:bg-violet-700 px-4 self-end shrink-0"
-            title="Gửi câu trả lời"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+              Xem báo cáo →
+            </Link>
+          </div>
         </div>
+      ) : (
+        /* ── ACTIVE: giao diện nhập ── */
+        <div className="pt-4 border-t border-zinc-800 mt-4 space-y-2">
+          {/* Live transcript badge when listening */}
+          <AnimatePresence>
+            {isListening && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30"
+              >
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs text-red-400">Đang ghi âm...</span>
+                {transcript && (
+                  <span className="text-xs text-zinc-300 truncate max-w-[60%]">{transcript}</span>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Hint text */}
-        {!sttSupported && (
-          <p className="text-xs text-zinc-600 text-center">
-            💡 Trình duyệt không hỗ trợ thu âm. Vui lòng dùng Chrome hoặc Edge.
-          </p>
-        )}
-      </div>
+          <div className="flex gap-2">
+            {/* Microphone button */}
+            {sttSupported && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleMicToggle}
+                disabled={sending || aiThinking}
+                title={isListening ? "Dừng ghi âm" : "Bắt đầu ghi âm"}
+                className={`shrink-0 transition-all ${
+                  isListening
+                    ? "border-red-500 bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 animate-pulse"
+                    : "border-zinc-700 text-zinc-400 hover:border-violet-500 hover:text-violet-400"
+                }`}
+              >
+                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+            )}
+
+            {/* Text input */}
+            <Textarea
+              ref={textareaRef}
+              placeholder={
+                isListening
+                  ? "Đang lắng nghe... (nhấn dừng hoặc gõ thêm)"
+                  : sttSupported
+                  ? "Gõ hoặc nhấn 🎙️ để nói... (Enter gửi, Shift+Enter xuống dòng)"
+                  : "Nhập câu trả lời của bạn..."
+              }
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (!recordingStartRef.current && e.target.value.length === 1) {
+                  recordingStartRef.current = Date.now();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              }}
+              className="min-h-[60px] max-h-[160px] resize-none"
+              disabled={sending || aiThinking}
+            />
+
+            {/* Send button */}
+            <Button
+              onClick={handleSend}
+              disabled={sending || aiThinking || !input.trim()}
+              className="bg-violet-600 hover:bg-violet-700 px-4 self-end shrink-0"
+              title="Gửi câu trả lời"
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          {/* Hint text */}
+          {!sttSupported && (
+            <p className="text-xs text-zinc-600 text-center">
+              💡 Trình duyệt không hỗ trợ thu âm. Vui lòng dùng Chrome hoặc Edge.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Exit Confirm Modal ──────────────────────────────────────────── */}
       <AnimatePresence>
