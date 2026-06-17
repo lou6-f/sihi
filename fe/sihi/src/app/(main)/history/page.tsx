@@ -3,6 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
+import { RevalidatingBadge } from "@/components/ui/revalidating-badge";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,13 +28,14 @@ export default function HistoryPage() {
 
   // SWR: cache by page — navigate về history show dữ liệu cached ngay lập tức
   const query = new URLSearchParams({ page: String(page), limit: "10" });
-  const { data, isLoading: loading } = useSWR<{ interviews: Interview[]; totalPages: number }>(
+  const { data, isLoading: loading, isValidating } = useSWR<{ interviews: Interview[]; totalPages: number }>(
     `/api/interviews?${query}`,
     fetcher
   );
 
   const interviews = data?.interviews || [];
   const totalPages = data?.totalPages || 1;
+  const revalidating = isValidating && !loading;
 
 
   const filtered = fieldFilter === "all" ? interviews : interviews.filter((iv) => iv.field === fieldFilter);
@@ -41,7 +43,10 @@ export default function HistoryPage() {
   return (
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold">Lịch sử phỏng vấn</h1>
+        <h1 className="text-3xl font-bold flex items-center gap-2 flex-wrap">
+          Lịch sử phỏng vấn
+          <RevalidatingBadge isValidating={revalidating} />
+        </h1>
         <p className="text-zinc-400">Xem lại các buổi phỏng vấn trước đây</p>
       </motion.div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import useSWR from "swr";
+import { RevalidatingBadge } from "@/components/ui/revalidating-badge";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,7 +65,7 @@ export default function InterviewSetupPage() {
   const [starting, setStarting] = useState(false);
 
   // CV list — SWR cầm dữ liệu, navigate về trang show ngay
-  const { data: cvData, isLoading: cvLoading, mutate: mutateCvList } = useSWR<CvItem[]>(
+  const { data: cvData, isLoading: cvLoading, isValidating: cvValidating, mutate: mutateCvList } = useSWR<CvItem[]>(
     "/api/cv",
     async (url: string) => {
       const res = await fetch(url);
@@ -75,6 +76,7 @@ export default function InterviewSetupPage() {
     }
   );
   const cvList: CvItem[] = cvData || [];
+  const cvRevalidating = cvValidating && !cvLoading;
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -241,8 +243,9 @@ export default function InterviewSetupPage() {
         {/* ── 3. CV ───────────────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-base text-zinc-200">
+            <h2 className="font-semibold text-base text-zinc-200 flex items-center gap-2">
               3. CV <span className="text-xs font-normal text-zinc-500 ml-1">(tuỳ chọn)</span>
+              <RevalidatingBadge isValidating={cvRevalidating} />
             </h2>
             <button
               onClick={() => fileRef.current?.click()}

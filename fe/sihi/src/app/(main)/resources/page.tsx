@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { RevalidatingBadge } from "@/components/ui/revalidating-badge";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,7 @@ export default function ResourcesPage() {
   if (fieldFilter !== "all") params.set("field", fieldFilter);
   if (levelFilter !== "all") params.set("level", levelFilter);
 
-  const { data: resData, isLoading } = useSWR<{ resources: Resource[] }>(
+  const { data: resData, isLoading, isValidating } = useSWR<{ resources: Resource[] }>(
     `/api/resources?${params}`,
     fetcher
   );
@@ -52,11 +53,15 @@ export default function ResourcesPage() {
   const resources = resData?.resources || [];
   const recommended = recData || [];
   const loading = isLoading;
+  const revalidating = isValidating && !isLoading;
 
   return (
     <div className="space-y-5">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold">Tài liệu học tập</h1>
+        <h1 className="text-3xl font-bold flex items-center gap-2 flex-wrap">
+          Tài liệu học tập
+          <RevalidatingBadge isValidating={revalidating} label="Đang cập nhật" />
+        </h1>
         <p className="text-zinc-400">Khám phá tài liệu phù hợp với bạn</p>
       </motion.div>
 

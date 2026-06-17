@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
+import { RevalidatingBadge } from "@/components/ui/revalidating-badge";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
@@ -106,7 +107,7 @@ function StatTile({ icon: Icon, label, value, sub, iconColor, delay }: {
 export default function DashboardPage() {
   const { data: session } = useSession();
   // ── SWR: interviews + progress (cached — return visits show data instantly) ──
-  const { data: intData, isLoading: intLoading } = useSWR<{ interviews: Interview[]; total: number }>(
+  const { data: intData, isLoading: intLoading, isValidating: intValidating } = useSWR<{ interviews: Interview[]; total: number }>(
     "/api/interviews?limit=30",
     fetcher
   );
@@ -130,6 +131,8 @@ export default function DashboardPage() {
   const fetchNews = useCallback(() => { mutateNews(); }, [mutateNews]);
 
   const loading = intLoading || progLoading;
+  // revalidating = SWR đang làm mới ngầm (có cache sẵn, không ở lại loading.tsx)
+  const revalidating = intValidating && !intLoading;
   const allInterviews: Interview[] = intData?.interviews || [];
   const interviews = allInterviews.slice(0, 5);
   const total = intData?.total ?? allInterviews.length;
@@ -155,8 +158,9 @@ export default function DashboardPage() {
         <div className="rounded-xl p-[2px] bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500">
           <div className="rounded-[10px] bg-zinc-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6">
             <div>
-              <h1 className="text-2xl font-bold">
+              <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap">
                 Xin chào, <span className="gradient-text">{firstName}</span> 👋
+                <RevalidatingBadge isValidating={revalidating} />
               </h1>
               <p className="mt-1 text-sm text-zinc-400">
                 {total === 0
