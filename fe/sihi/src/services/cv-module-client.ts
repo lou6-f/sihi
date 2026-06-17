@@ -56,6 +56,29 @@ interface CVModuleAnalysis {
   }>;
 }
 
+// cv-module evaluation result types
+export interface CVModuleEvalQuestion {
+  question_index: number;
+  question_text: string;
+  answer_text: string;
+  star_scores: { situation: number; task: number; action: number; result: number };
+  question_score: number; // 0-10
+  comment: string;
+}
+
+export interface CVModuleEvalResult {
+  questions: CVModuleEvalQuestion[];
+  overall: {
+    overall_score: number;  // 0-10
+    strengths: string[];
+    key_improvements: string[];
+    overall_comment: string;
+  };
+  kg_context_used: boolean;
+  session_id: string;
+  processing_time_ms: number;
+}
+
 // ─────────────────────────────────────
 // Client
 // ─────────────────────────────────────
@@ -168,6 +191,63 @@ export class CVModuleClient {
     const raw = await this.pollUntilDone(session.session_id);
     const result = mapToSiHiFormat(raw);
     return { result, sessionId: session.session_id, questions: raw.questions };
+  }
+
+  /**
+   * Gửi transcript lên cv-module để chấm điểm (có KG context từ cv_session_id).
+   * Poll cho đến khi có kết quả.
+   */
+  async evaluateAndWait(params: {
+    transcript: Array<{ role: "user" | "model"; text: string }>;
+    cvSessionId: string;
+    userId?: string;
+    interviewSessionId?: string;
+    timeoutMs?: number;
+  }): Promise<CVModuleEvalResult> {
+    const timeout = params.timeoutMs ?? 120_000; // 2 phút
+
+    // Submit evaluation job
+    const submitRes = await fetch(`${this.baseUrl}/api/evaluations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        interview: params.transcript,
+        cv_session_id: params.cvSessionId,
+        user_id: params.userId,
+        interview_session_id: params.interviewSessionId,
+        target_language: "vi",
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!submitRes.ok) {
+      const err = await submitRes.text();
+      throw new Error(`cv-module evaluate submit failed (${submitRes.status}): ${err}`);
+    }
+
+    const { session_id } = await submitRes.json() as { session_id: string; status: string };
+
+    // Poll until done
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      await sleep(3000);
+      const pollRes = await fetch(`${this.baseUrl}/api/evaluations/${session_id}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (pollRes.status === 202) continue; // still processing
+
+      if (!pollRes.ok) {
+        const err = await pollRes.text();
+        throw new Error(`cv-module evaluate poll failed (${pollRes.status}): ${err}`);
+      }
+
+      const data = await pollRes.json();
+      if (data.status === "failed") throw new Error(`cv-module evaluation failed: ${data.detail || data.reason}`);
+      if (data.status !== "processing") return { ...data, session_id } as CVModuleEvalResult;
+    }
+
+    throw new Error("cv-module evaluation timeout (>2 phút)");
   }
 }
 

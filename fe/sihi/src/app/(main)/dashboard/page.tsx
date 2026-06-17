@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BrainCircuit, TrendingUp, Clock, Flame, Play, BarChart3 } from "lucide-react";
+import { BrainCircuit, TrendingUp, Clock, Flame, Play, BarChart3, RefreshCw } from "lucide-react";
 
 // ─── Constants ──────────────────────────────────────────────────
 const FIELD_LABELS: Record<string, string> = { FRONTEND: "Frontend", BACKEND: "Backend", DATA: "Data", FULLSTACK: "Fullstack" };
@@ -58,13 +58,22 @@ interface Interview { id: string; field: string; level: string; status: string; 
 interface ProgressSnapshot { overallScore: number; readinessLevel: string; suggestion: string; totalInterviews: number; }
 interface NewsItem {
   id: string; title: string; source: string; date: string; dateLabel: string;
-  url: string; image: string | null; company: "FPT" | "Viettel" | "VNG";
+  url: string; image: string | null;
+  company: "FPT" | "Viettel" | "VNG" | "VinGroup" | "VNPT" | "MoMo" | "Techcombank" | "MB" | "Tiki" | "Shopee" | "TopDev";
 }
 
 const COMPANY_COLOR: Record<string, string> = {
-  FPT: "bg-orange-500/20 text-orange-300",
-  Viettel: "bg-red-500/20 text-red-300",
-  VNG: "bg-blue-500/20 text-blue-300",
+  FPT:         "bg-orange-500/20 text-orange-300",
+  Viettel:     "bg-red-500/20 text-red-300",
+  VNG:         "bg-blue-500/20 text-blue-300",
+  VinGroup:    "bg-emerald-500/20 text-emerald-300",
+  VNPT:        "bg-sky-500/20 text-sky-300",
+  MoMo:        "bg-pink-500/20 text-pink-300",
+  Techcombank: "bg-rose-500/20 text-rose-300",
+  MB:          "bg-indigo-500/20 text-indigo-300",
+  Tiki:        "bg-cyan-500/20 text-cyan-300",
+  Shopee:      "bg-amber-500/20 text-amber-300",
+  TopDev:      "bg-violet-500/20 text-violet-300",
 };
 
 // ─── Stat tile ──────────────────────────────────────────────────
@@ -80,9 +89,9 @@ function StatTile({ icon: Icon, label, value, sub, iconColor, delay }: {
             <Icon className="h-5 w-5 text-white" />
           </div>
           <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">{label}</p>
-            <p className="text-2xl font-bold leading-tight">{value}</p>
-            {sub && <p className="text-xs text-zinc-500 mt-0.5">{sub}</p>}
+            <p className="text-xs text-zinc-100 uppercase tracking-widest font-medium">{label}</p>
+            <p className="text-2xl font-bold leading-tight text-white">{value}</p>
+            {sub && <p className="text-xs text-zinc-300 mt-0.5">{sub}</p>}
           </div>
         </CardContent>
       </Card>
@@ -101,6 +110,26 @@ export default function DashboardPage() {
 
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsLastUpdated, setNewsLastUpdated] = useState<Date | null>(null);
+  const newsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 phút
+
+  const fetchNews = useCallback(async (silent = false) => {
+    if (silent) setNewsRefreshing(true);
+    try {
+      const res = await fetch("/api/news/recruitment");
+      const data = await res.json();
+      setNews(data.items || []);
+      setNewsLastUpdated(new Date());
+    } catch {
+      // giữ nguyên data cũ nếu lỗi
+    } finally {
+      setNewsLoading(false);
+      setNewsRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -115,20 +144,24 @@ export default function DashboardPage() {
       setLoading(false);
     }).catch(() => setLoading(false));
 
-    // Fetch real recruitment news
-    fetch("/api/news/recruitment")
-      .then((r) => r.json())
-      .then((data) => { setNews(data.items || []); setNewsLoading(false); })
-      .catch(() => setNewsLoading(false));
-  }, []);
+    // Fetch lần đầu
+    fetchNews(false);
+
+    // Tự động cập nhật mỗi 30 phút (background, không reload trang)
+    newsIntervalRef.current = setInterval(() => fetchNews(true), REFRESH_INTERVAL_MS);
+
+    return () => {
+      if (newsIntervalRef.current) clearInterval(newsIntervalRef.current);
+    };
+  }, [fetchNews]);
 
   const streak = calcStreak(allInterviews);
-  // Ưu tiên dùng analytics API, fallback tính thẳng từ interviews
-  const scoredInterviews = allInterviews.filter((iv) => iv.totalScore !== null && iv.totalScore > 0);
-  const directAvg = scoredInterviews.length
+  // avgScore = trung bình cộng đơn giản từ totalScore các buổi phỏng vấn đã có điểm
+  const scoredInterviews = allInterviews.filter((iv) => iv.totalScore !== null);
+  const avgScore = scoredInterviews.length
     ? Math.round(scoredInterviews.reduce((s, iv) => s + (iv.totalScore ?? 0), 0) / scoredInterviews.length)
     : null;
-  const avgScore = progress?.overallScore ?? directAvg;
+  // readiness = từ analytics API (UserProgressSnapshot), hoàn toàn độc lập với avgScore
   const readiness = progress ? READINESS_LABELS[progress.readinessLevel] : null;
   const firstName = session?.user?.name?.split(" ").pop() || "bạn";
 
@@ -151,8 +184,16 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link href="/interview" className="shrink-0">
-              <Button className="bg-violet-600 hover:bg-violet-700 gap-2 px-6 h-11">
-                <Play className="h-4 w-4 fill-white" />
+              <Button
+                className="relative overflow-hidden gap-2 px-7 h-12 font-semibold text-white
+                  bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600
+                  hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500
+                  shadow-[0_0_20px_rgba(139,92,246,0.5)] hover:shadow-[0_0_32px_rgba(139,92,246,0.8)]
+                  transition-all duration-300 border-0 animate-pulse-glow
+                  before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent
+                  before:translate-x-[-200%] hover:before:translate-x-[200%] before:transition-transform before:duration-500"
+              >
+                <Play className="h-4 w-4 fill-white drop-shadow" />
                 Bắt đầu phỏng vấn
               </Button>
             </Link>
@@ -230,7 +271,7 @@ export default function DashboardPage() {
                     <Badge className="text-sm px-3 py-1 bg-zinc-700/50 text-zinc-400">Chưa có dữ liệu</Badge>
                   </div>
                   <Progress value={0} className="h-2" />
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-sm text-zinc-300">
                     {allInterviews.length === 0
                       ? "Hoàn thành phỏng vấn đầu tiên để xem đánh giá"
                       : "Hệ thống AI sẽ tổng hợp đánh giá sau khi phỏng vấn được chấm điểm"}
@@ -258,7 +299,7 @@ export default function DashboardPage() {
               {loading ? (
                 <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : interviews.length === 0 ? (
-                <p className="text-sm text-zinc-500">Chưa có phỏng vấn nào.</p>
+                <p className="text-sm text-zinc-300">Chưa có phỏng vấn nào</p>
               ) : (
                 <div className="space-y-2">
                   {interviews.map((iv) => (
@@ -297,6 +338,27 @@ export default function DashboardPage() {
           <h2 className="text-base font-semibold flex items-center gap-2">
             <span className="text-lg">🔥</span> Tin tuyển dụng nổi bật
           </h2>
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            {newsLastUpdated && !newsRefreshing && (
+              <span>
+                Cập nhật lúc {newsLastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            <button
+              onClick={() => fetchNews(true)}
+              disabled={newsRefreshing}
+              className="p-1 rounded hover:bg-zinc-800 transition-colors disabled:cursor-not-allowed"
+              title="Cập nhật ngay"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 transition-colors ${
+                  newsRefreshing
+                    ? "animate-spin text-violet-400"
+                    : "text-zinc-500 hover:text-violet-400"
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {newsLoading ? (

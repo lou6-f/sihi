@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TopProgressBar } from "@/components/shared/top-progress-bar";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi" className="dark" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <AuthSessionProvider>
+          <TopProgressBar />
           {children}
           <Toaster richColors position="top-right" />
         </AuthSessionProvider>

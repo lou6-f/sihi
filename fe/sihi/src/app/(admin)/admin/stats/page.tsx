@@ -356,35 +356,7 @@ export default function AdminStatsPage() {
                       </Badge>
                     </TableCell>
                   </TableRow>
-                  <TableRow className="border-zinc-800/50 hover:bg-zinc-800/30">
-                    <TableCell className="text-zinc-300">
-                      Trung bình PV / người dùng
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      <Badge className="bg-violet-500/20 text-violet-400">
-                        {stats.totalUsers > 0
-                          ? (
-                              stats.totalInterviews / stats.totalUsers
-                            ).toFixed(1)
-                          : 0}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="border-zinc-800/50 hover:bg-zinc-800/30">
-                    <TableCell className="text-zinc-300">
-                      Tài liệu / lĩnh vực (TB)
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      <Badge className="bg-indigo-500/20 text-indigo-400">
-                        {stats.interviewsByField?.length
-                          ? Math.round(
-                              stats.totalResources /
-                                stats.interviewsByField.length
-                            )
-                          : stats.totalResources}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+
                   <TableRow className="border-zinc-800/50 hover:bg-zinc-800/30">
                     <TableCell className="text-zinc-300">
                       Tỉ lệ người dùng hoạt động

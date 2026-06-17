@@ -4,6 +4,7 @@ import { buildEvaluatorPrompt } from "@/prompts/evaluator";
 import { aggregateVocalMetrics, computeVocalMetrics } from "@/prompts/vocal-analyzer";
 import type { ResourceRecommendationService } from "./resource-recommendation.service";
 import type { AnalyticsEngineService } from "./analytics-engine.service";
+import { getCVModuleClient, type CVModuleEvalResult } from "./cv-module-client";
 
 // ═══════════════════════════════════════
 // Types
@@ -80,8 +81,8 @@ export class ReportGenerationService {
 
     const cvSummary = interview.cv?.analysis ? JSON.stringify(interview.cv.analysis) : undefined;
 
-    // 5. Call AI for full evaluation
-    const messages = buildEvaluatorPrompt({
+    // 4. Build Gemini prompt (always needed — provides detail even in Hybrid mode)
+    const geminiMessages = buildEvaluatorPrompt({
       field: interview.field,
       level: interview.level,
       transcript,
@@ -98,16 +99,45 @@ export class ReportGenerationService {
       },
     });
 
-    const response = await this.ai.chat(messages, { temperature: 0.2, responseFormat: "json" });
+    // 5. HYBRID: call cv-module + Gemini in PARALLEL
+    const cvSessionId = (interview.cv as unknown as { cvModuleSessionId?: string } | null)?.cvModuleSessionId;
 
+    const cvModuleTranscript = interview.messages.map((m) => ({
+      role: m.role === "USER" ? "user" : "model" as "user" | "model",
+      text: m.content,
+    }));
+
+    const [cvModuleSettled, geminiSettled] = await Promise.allSettled([
+      // cv-module: chỉ chạy nếu có CV session
+      cvSessionId
+        ? getCVModuleClient().isAvailable().then((ok) => {
+            if (!ok) throw new Error("cv-module not available");
+            console.log(`[Report] cv-module starting (KG session: ${cvSessionId})`);
+            return getCVModuleClient().evaluateAndWait({
+              transcript: cvModuleTranscript,
+              cvSessionId,
+              userId: interview.userId,
+              interviewSessionId: interview.id,
+            });
+          })
+        : Promise.reject(new Error("no CV session")),
+      // Gemini: luôn chạy
+      this.ai.chat(geminiMessages, { temperature: 0.2, responseFormat: "json" }),
+    ]);
+
+    // 6. Parse Gemini result (required)
     let evaluation: Record<string, unknown>;
-    try {
-      evaluation = JSON.parse(response.content);
-    } catch {
-      throw new Error("AI trả về kết quả đánh giá không hợp lệ");
+    if (geminiSettled.status === "fulfilled") {
+      try {
+        evaluation = JSON.parse(geminiSettled.value.content);
+      } catch {
+        throw new Error("AI trả về kết quả đánh giá không hợp lệ");
+      }
+    } else {
+      throw new Error("Gemini evaluation failed: " + geminiSettled.reason);
     }
 
-    // 6. Adjust dimension scores for vocal penalties (max ±10 on communication)
+    // 7. Apply vocal penalty to Gemini communication score
     const dimensionScores = evaluation.dimensionScores as Record<string, { score: number; comment: string; reason: string }> | undefined;
     const hasVoiceData = vocalAnalysis.totalSpeakingMs > 0;
     if (dimensionScores && hasVoiceData) {
@@ -116,15 +146,37 @@ export class ReportGenerationService {
       ));
     }
 
-    const competencyProfile = evaluation.competencyProfile as Record<string, { score: number; comment: string }> | undefined;
+    // 8. HYBRID MERGE: override overallScore với cv-module nếu thành công
+    let calcOverallScore: number;
+    if (cvModuleSettled.status === "fulfilled") {
+      const cvResult = cvModuleSettled.value;
+      const cvScore100 = Math.round(cvResult.overall.overall_score * 10); // 0-10 → 0-100
+      console.log(`[Report] Hybrid: cv-module score=${cvScore100}, Gemini detail used`);
 
-    // Tính overallScore từ Group 1 theo trọng số
-    const calcOverallScore = dimensionScores ? Math.round(
-      (dimensionScores.technicalKnowledge?.score ?? 0) * 0.35 +
-      (dimensionScores.problemSolving?.score ?? 0) * 0.30 +
-      (dimensionScores.practicalExperience?.score ?? 0) * 0.20 +
-      (dimensionScores.communication?.score ?? 0) * 0.15
-    ) : (evaluation.overallScore as number ?? 0);
+      // overallScore = cv-module (KG-enriched, sát CV thực tế hơn)
+      calcOverallScore = cvScore100;
+
+      // Merge strengths/weaknesses từ cả 2 nguồn
+      const geminiStrengths = (evaluation.strengths as string[]) ?? [];
+      const geminiWeaknesses = (evaluation.weaknesses as string[]) ?? [];
+      const cvStrengths = cvResult.overall.strengths ?? [];
+      const cvWeaknesses = cvResult.overall.key_improvements ?? [];
+
+      evaluation.strengths = [...new Set([...cvStrengths, ...geminiStrengths])].slice(0, 6);
+      evaluation.weaknesses = [...new Set([...cvWeaknesses, ...geminiWeaknesses])].slice(0, 6);
+      evaluation.overallComment = `[KG] ${cvResult.overall.overall_comment}\n\n${evaluation.overallComment ?? ""}`.trim();
+    } else {
+      // cv-module không có / thất bại → dùng Gemini score
+      console.warn("[Report] cv-module unavailable, using Gemini score:", cvModuleSettled.reason);
+      calcOverallScore = dimensionScores ? Math.round(
+        (dimensionScores.technicalKnowledge?.score ?? 0) * 0.35 +
+        (dimensionScores.problemSolving?.score ?? 0) * 0.30 +
+        (dimensionScores.practicalExperience?.score ?? 0) * 0.20 +
+        (dimensionScores.communication?.score ?? 0) * 0.15
+      ) : (evaluation.overallScore as number ?? 0);
+    }
+
+    const competencyProfile = evaluation.competencyProfile as Record<string, { score: number; comment: string }> | undefined;
 
     // 7. Create/update report in DB with all advanced fields
     const reportData = {

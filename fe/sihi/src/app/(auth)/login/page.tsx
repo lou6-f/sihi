@@ -16,9 +16,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [notVerified, setNotVerified] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setNotVerified(false);
     setLoading(true);
 
     const result = await signIn("credentials", {
@@ -28,7 +31,11 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError(result.error);
+      if (result.error === "EMAIL_NOT_VERIFIED") {
+        setNotVerified(true);
+      } else {
+        setError(result.error);
+      }
     } else {
       window.location.href = "/dashboard";
     }
@@ -48,6 +55,16 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-lg bg-destructive/10 p-3 text-sm text-red-400">{error}</div>
             )}
+            {notVerified && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-300 space-y-1">
+                <p className="font-semibold">Email chưa được xác thực</p>
+                <p>Vui lòng kiểm tra hộp thư và nhập mã OTP.{" "}
+                  <a href={`/verify-email?email=${encodeURIComponent(email)}`} className="underline hover:text-amber-200">
+                    Xác thực ngay →
+                  </a>
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -55,6 +72,7 @@ export default function LoginPage() {
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
                   id="email" type="email" placeholder="you@example.com"
+                  autoComplete="off"
                   value={email} onChange={(e) => setEmail(e.target.value)}
                   className="pl-10" required
                 />
@@ -71,7 +89,8 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
-                  id="password" type="password" placeholder="••••••••"
+                  id="password" type="password" placeholder="Mật khẩu của bạn"
+                  autoComplete="new-password"
                   value={password} onChange={(e) => setPassword(e.target.value)}
                   className="pl-10" required
                 />

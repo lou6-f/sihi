@@ -60,7 +60,7 @@ function NavLink({
       href={href}
       onClick={handleClick}
       className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
-        active ? "bg-violet-500/15 text-violet-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        active ? "bg-violet-500/15 text-violet-300" : "text-zinc-100 hover:bg-zinc-800 hover:text-white"
       }`}
     >
       <Icon className="h-5 w-5 shrink-0" />
@@ -97,11 +97,11 @@ function MainLayoutInner({ children }: { children: React.ReactNode }) {
             <>
               <Separator className="my-2 bg-zinc-800" />
               <Link
-                href="/admin/dashboard"
+                href="/admin/stats"
                 className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-amber-400 hover:bg-zinc-800"
               >
                 <Shield className="h-5 w-5 shrink-0" />
-                Admin Panel
+                Trang quản trị
               </Link>
             </>
           )}

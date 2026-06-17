@@ -44,6 +44,24 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { field, level, cvId, targetRole, jobDescription, jdMode } = createInterviewSchema.parse(body);
 
+  // ── Tầng 1: Check for active (non-finished) interview ─────────────────────
+  const FINAL_STATUSES = ["COMPLETED", "CANCELLED", "ABANDONED", "ERROR"];
+  const activeInterview = await prisma.interview.findFirst({
+    where: {
+      userId: session.user.id,
+      status: { notIn: FINAL_STATUSES as never[] },
+    },
+    select: { id: true, field: true, level: true, status: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (activeInterview) {
+    return NextResponse.json(
+      { error: "Bạn có phỏng vấn đang dở", existingInterview: activeInterview },
+      { status: 409 }
+    );
+  }
+
   const template = await prisma.interviewTemplate.findUnique({
     where: { field_level: { field, level } },
   });

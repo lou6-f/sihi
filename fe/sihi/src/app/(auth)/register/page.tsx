@@ -97,8 +97,8 @@ export default function RegisterPage() {
       return;
     }
 
-    toast.success("Đăng ký thành công! Vui lòng đăng nhập.");
-    router.push("/login");
+    toast.success("Đăng ký thành công! Kiểm tra email để lấy mã xác thực.");
+    router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
   };
 
   return (
@@ -143,6 +143,7 @@ export default function RegisterPage() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="off"
                   placeholder="you@example.com"
                   value={form.email}
                   onChange={set("email")}
@@ -161,6 +162,7 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="Ví dụ: Long@2024"
                   value={form.password}
                   onChange={set("password")}
@@ -194,6 +196,7 @@ export default function RegisterPage() {
                 <Input
                   id="confirmPassword"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="Nhập lại mật khẩu"
                   value={form.confirmPassword}
                   onChange={set("confirmPassword")}

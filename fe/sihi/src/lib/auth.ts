@@ -30,6 +30,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Tài khoản đã bị vô hiệu hóa");
         }
 
+        if (!user.emailVerified) {
+          throw new Error("EMAIL_NOT_VERIFIED");
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password

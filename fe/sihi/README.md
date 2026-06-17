@@ -149,12 +149,32 @@ sihi/
 
 ## 🔑 Tính năng
 
-- **Phỏng vấn AI** — Gemini sinh câu hỏi adaptive theo CV và JD
-- **Phân tích CV** — Upload PDF, AI trích xuất và phân tích kỹ năng
-- **Đánh giá thời gian thực** — Mỗi câu trả lời được chấm điểm chi tiết
-- **Báo cáo toàn diện** — Điểm tổng, tiêu chí chi tiết, mức độ sẵn sàng
+### Phỏng vấn AI
+- **Sinh câu hỏi adaptive** — Gemini điều chỉnh độ khó theo CV và JD theo thời gian thực
+- **Chế độ phỏng vấn linh hoạt** — Tổng quát / CV only / JD only / CV + JD
+- **STT/TTS tích hợp** — Hỏi bằng giọng nói, trả lời bằng micro
+- **Bảo vệ phiên phỏng vấn** — 3 lớp xử lý khi người dùng thoát giữa chừng:
+  - **Lớp 1** — Dialog nhắc tiếp tục / hủy khi bắt đầu phiên mới
+  - **Lớp 2** — Inactivity dialog sau 10 phút không thao tác (countdown 5 phút)
+  - **Lớp 3** — `sendBeacon` tự động đánh dấu `ABANDONED` khi đóng tab
+
+### Quản lý & Phân tích
+- **Phân tích CV** — Upload PDF, AI trích xuất và so sánh với JD
+- **Báo cáo toàn diện** — Điểm tổng, tiêu chí chi tiết, gợi ý cải thiện, lộ trình học
+- **Lịch sử phỏng vấn** — Phân loại: Hoàn thành / Đang diễn ra / Bỏ dở
+- **Phân tích kỹ năng** — Biểu đồ tiến trình, top & weak skills, mức độ sẵn sàng
 - **Gợi ý tài liệu** — RAG-based recommendation system
-- **Quản lý admin** — User management, AI monitoring, resource CRUD
+
+### Trang quản trị (`/admin`)
+- **Quản lý người dùng** — Phân quyền USER / ADMIN
+- **AI Monitoring** — Theo dõi API calls, chi phí, token usage
+- **Quản lý tài liệu** — CRUD resources, duyệt đề xuất từ AI curator
+- **Quản lý mẫu phỏng vấn** — Templates theo lĩnh vực & cấp độ
+
+### UX
+- **Top progress bar** — Thanh tải tím xuất hiện ngay khi điều hướng giữa các trang
+- **Dark mode** — Giao diện tối với glassmorphism
+- **Responsive** — Mobile-first sidebar navigation
 
 ---
 
@@ -166,6 +186,19 @@ sihi/
 - File upload: private storage, stream có xác thực
 - Zod validation trên tất cả endpoints
 - Role-based access control (USER / ADMIN)
+- OTP email verification cho đăng ký và đặt lại mật khẩu
+
+---
+
+## 📊 Trạng thái phỏng vấn
+
+| Trạng thái | Ý nghĩa | Hiển thị |
+|-----------|---------|---------|
+| `PREPARING` / `CONNECTING` | Đang khởi tạo | 🔄 Đang diễn ra |
+| `COMPLETED` | Hoàn thành đủ câu hỏi | ✅ Hoàn thành |
+| `ABANDONED` | Bỏ dở (thoát tab / hết giờ inactivity) | ⚪ Bỏ dở |
+| `CANCELLED` | Kết thúc sớm thủ công | ⚪ Bỏ dở |
+| `ERROR` | Lỗi hệ thống | ⚪ Bỏ dở |
 
 ---
 

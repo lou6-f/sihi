@@ -67,6 +67,14 @@ async function main() {
       description: "Phỏng vấn Fresher Frontend",
     },
     {
+      name: "Frontend Junior",
+      field: InterviewField.FRONTEND,
+      level: InterviewLevel.JUNIOR,
+      questionCount: 12,
+      durationMinutes: 25,
+      description: "Phỏng vấn Junior Frontend",
+    },
+    {
       name: "Backend Intern",
       field: InterviewField.BACKEND,
       level: InterviewLevel.INTERN,
@@ -83,12 +91,12 @@ async function main() {
       description: "Phỏng vấn Fresher Backend",
     },
     {
-      name: "Fullstack Fresher",
-      field: InterviewField.FULLSTACK,
-      level: InterviewLevel.FRESHER,
-      questionCount: 10,
+      name: "Backend Junior",
+      field: InterviewField.BACKEND,
+      level: InterviewLevel.JUNIOR,
+      questionCount: 12,
       durationMinutes: 25,
-      description: "Phỏng vấn Fresher Fullstack",
+      description: "Phỏng vấn Junior Backend",
     },
     {
       name: "Data Intern",
@@ -98,7 +106,153 @@ async function main() {
       durationMinutes: 15,
       description: "Phỏng vấn thực tập Data cơ bản",
     },
+    {
+      name: "Data Fresher",
+      field: InterviewField.DATA,
+      level: InterviewLevel.FRESHER,
+      questionCount: 10,
+      durationMinutes: 20,
+      description: "Phỏng vấn Fresher Data",
+    },
+    {
+      name: "Data Junior",
+      field: InterviewField.DATA,
+      level: InterviewLevel.JUNIOR,
+      questionCount: 12,
+      durationMinutes: 25,
+      description: "Phỏng vấn Junior Data",
+    },
+    {
+      name: "Fullstack Intern",
+      field: InterviewField.FULLSTACK,
+      level: InterviewLevel.INTERN,
+      questionCount: 10,
+      durationMinutes: 20,
+      description: "Phỏng vấn thực tập Fullstack",
+    },
+    {
+      name: "Fullstack Fresher",
+      field: InterviewField.FULLSTACK,
+      level: InterviewLevel.FRESHER,
+      questionCount: 10,
+      durationMinutes: 25,
+      description: "Phỏng vấn Fresher Fullstack",
+    },
+    {
+      name: "Fullstack Junior",
+      field: InterviewField.FULLSTACK,
+      level: InterviewLevel.JUNIOR,
+      questionCount: 12,
+      durationMinutes: 30,
+      description: "Phỏng vấn Junior Fullstack",
+    },
   ];
+
+  // ═══════════════════════════════════════
+  // Sections map: key = `${field}_${level}`
+  // Tổng questionCount phải khớp với template.questionCount
+  // ═══════════════════════════════════════
+  type SectionDef = {
+    category: QuestionCategory;
+    questionCount: number;
+    difficultyMin: number;
+    difficultyMax: number;
+    weight: number;
+    description: string;
+  };
+
+  const SECTIONS_MAP: Record<string, SectionDef[]> = {
+    // ── FRONTEND ───────────────────────────────────────────────────────────
+    // Total: 8
+    FRONTEND_INTERN: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 3, difficultyMin: 1, difficultyMax: 2, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 3, difficultyMin: 2, difficultyMax: 3, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 2, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 10
+    FRONTEND_FRESHER: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 2, difficultyMin: 1, difficultyMax: 2, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 4, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.PROJECT,    questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 2, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 12
+    FRONTEND_JUNIOR: [
+      { category: QuestionCategory.TECHNICAL,   questionCount: 5, difficultyMin: 3, difficultyMax: 4, weight: 2.0, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.PROJECT,     questionCount: 3, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.SITUATIONAL, questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Tình huống thực tế" },
+      { category: QuestionCategory.BEHAVIORAL,  questionCount: 1, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+      { category: QuestionCategory.ALGORITHM,   questionCount: 1, difficultyMin: 3, difficultyMax: 4, weight: 1.5, description: "Tư duy thuật toán" },
+    ],
+
+    // ── BACKEND ────────────────────────────────────────────────────────────
+    // Total: 8
+    BACKEND_INTERN: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 3, difficultyMin: 1, difficultyMax: 2, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 3, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 2, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 10
+    BACKEND_FRESHER: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 2, difficultyMin: 1, difficultyMax: 3, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 4, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.ALGORITHM,  questionCount: 2, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Tư duy thuật toán" },
+      { category: QuestionCategory.PROJECT,    questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Kinh nghiệm dự án" },
+    ],
+    // Total: 12
+    BACKEND_JUNIOR: [
+      { category: QuestionCategory.TECHNICAL,   questionCount: 4, difficultyMin: 3, difficultyMax: 5, weight: 2.0, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.ALGORITHM,   questionCount: 3, difficultyMin: 3, difficultyMax: 5, weight: 2.0, description: "Tư duy thuật toán" },
+      { category: QuestionCategory.PROJECT,     questionCount: 3, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.SITUATIONAL, questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Tình huống thực tế" },
+    ],
+
+    // ── DATA ───────────────────────────────────────────────────────────────
+    // Total: 8
+    DATA_INTERN: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 4, difficultyMin: 1, difficultyMax: 2, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 3, difficultyMin: 2, difficultyMax: 3, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 1, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 10
+    DATA_FRESHER: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 3, difficultyMin: 1, difficultyMax: 3, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 3, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.ALGORITHM,  questionCount: 2, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Tư duy thuật toán" },
+      { category: QuestionCategory.PROJECT,    questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Kinh nghiệm dự án" },
+    ],
+    // Total: 12
+    DATA_JUNIOR: [
+      { category: QuestionCategory.ALGORITHM,   questionCount: 4, difficultyMin: 3, difficultyMax: 5, weight: 2.0, description: "Tư duy thuật toán" },
+      { category: QuestionCategory.TECHNICAL,   questionCount: 3, difficultyMin: 3, difficultyMax: 5, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.FOUNDATION,  questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.PROJECT,     questionCount: 2, difficultyMin: 2, difficultyMax: 4, weight: 1.0, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.SITUATIONAL, questionCount: 1, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Tình huống thực tế" },
+    ],
+
+    // ── FULLSTACK ──────────────────────────────────────────────────────────
+    // Total: 10
+    FULLSTACK_INTERN: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 3, difficultyMin: 1, difficultyMax: 2, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 4, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 3, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 10
+    FULLSTACK_FRESHER: [
+      { category: QuestionCategory.FOUNDATION, questionCount: 2, difficultyMin: 1, difficultyMax: 3, weight: 1.0, description: "Kiến thức nền tảng" },
+      { category: QuestionCategory.TECHNICAL,  questionCount: 4, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.PROJECT,    questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.BEHAVIORAL, questionCount: 2, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+    // Total: 12
+    FULLSTACK_JUNIOR: [
+      { category: QuestionCategory.TECHNICAL,   questionCount: 4, difficultyMin: 3, difficultyMax: 5, weight: 2.0, description: "Kiến thức kỹ thuật chuyên sâu" },
+      { category: QuestionCategory.PROJECT,     questionCount: 3, difficultyMin: 2, difficultyMax: 4, weight: 1.5, description: "Kinh nghiệm dự án" },
+      { category: QuestionCategory.ALGORITHM,   questionCount: 2, difficultyMin: 3, difficultyMax: 5, weight: 1.5, description: "Tư duy thuật toán" },
+      { category: QuestionCategory.SITUATIONAL, questionCount: 2, difficultyMin: 2, difficultyMax: 3, weight: 1.0, description: "Tình huống thực tế" },
+      { category: QuestionCategory.BEHAVIORAL,  questionCount: 1, difficultyMin: 1, difficultyMax: 2, weight: 0.5, description: "Kỹ năng mềm và hành vi" },
+    ],
+  };
 
   for (const tpl of templates) {
     const template = await prisma.interviewTemplate.upsert({
@@ -110,69 +264,26 @@ async function main() {
       },
     });
 
-    // Create sections for each template
-    const sections = [
-      {
-        category: QuestionCategory.FOUNDATION,
-        questionCount: 2,
-        difficultyMin: 1,
-        difficultyMax: 2,
-        weight: 1.0,
-        orderIndex: 0,
-        description: "Kiến thức nền tảng",
-      },
-      {
-        category: QuestionCategory.TECHNICAL,
-        questionCount: 3,
-        difficultyMin: 2,
-        difficultyMax: 4,
-        weight: 1.5,
-        orderIndex: 1,
-        description: "Kiến thức kỹ thuật chuyên sâu",
-      },
-      {
-        category: QuestionCategory.PROJECT,
-        questionCount: 2,
-        difficultyMin: 2,
-        difficultyMax: 3,
-        weight: 1.0,
-        orderIndex: 2,
-        description: "Kinh nghiệm dự án",
-      },
-      {
-        category: QuestionCategory.ALGORITHM,
-        questionCount: 2,
-        difficultyMin: 2,
-        difficultyMax: 4,
-        weight: 1.5,
-        orderIndex: 3,
-        description: "Tư duy thuật toán",
-      },
-      {
-        category: QuestionCategory.BEHAVIORAL,
-        questionCount: 1,
-        difficultyMin: 1,
-        difficultyMax: 2,
-        weight: 0.5,
-        orderIndex: 4,
-        description: "Kỹ năng mềm và hành vi",
-      },
-    ];
-
-    // Only create sections if template was newly created
-    const existingSections = await prisma.interviewTemplateSection.count({
+    // Xóa sections cũ rồi tạo lại để luôn đồng bộ với SECTIONS_MAP
+    await prisma.interviewTemplateSection.deleteMany({
       where: { templateId: template.id },
     });
 
-    if (existingSections === 0) {
-      for (const section of sections) {
-        await prisma.interviewTemplateSection.create({
-          data: {
-            templateId: template.id,
-            ...section,
-          },
-        });
-      }
+    const sectionDefs = SECTIONS_MAP[`${tpl.field}_${tpl.level}`] ?? [];
+    for (let i = 0; i < sectionDefs.length; i++) {
+      const def = sectionDefs[i];
+      await prisma.interviewTemplateSection.create({
+        data: {
+          templateId: template.id,
+          category: def.category,
+          questionCount: def.questionCount,
+          difficultyMin: def.difficultyMin,
+          difficultyMax: def.difficultyMax,
+          weight: def.weight,
+          description: def.description,
+          orderIndex: i,
+        },
+      });
     }
 
     // Create rubric

@@ -174,7 +174,9 @@ function SectionTitle({ icon: Icon, label }: { icon: React.ElementType; label: s
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function ProfilePage() {
+  const { update } = useSession();
   const [profile, setProfile] = useState<Record<string, string | number | boolean | null>>({});
+  const [formData, setFormData] = useState<Record<string, string | number | boolean | null>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
@@ -184,6 +186,7 @@ export default function ProfilePage() {
     fetch("/api/users/me").then((r) => r.json()).then((d) => {
       if (d.yearOfStudy && (d.yearOfStudy < 1 || d.yearOfStudy > 6)) d.yearOfStudy = null;
       setProfile(d);
+      setFormData(d); // form copy riêng
       setLoading(false);
     });
   }, []);
@@ -194,15 +197,24 @@ export default function ProfilePage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: profile.name, school: profile.school, major: profile.major,
-        yearOfStudy: profile.yearOfStudy ? Number(profile.yearOfStudy) : undefined,
-        itField: profile.itField,
+        name: formData.name, school: formData.school, major: formData.major,
+        yearOfStudy: formData.yearOfStudy ? Number(formData.yearOfStudy) : undefined,
+        itField: formData.itField,
       }),
     });
     setSaving(false);
-    if (res.ok) toast.success("Đã lưu thông tin!");
-    else toast.error("Lỗi cập nhật");
+    if (res.ok) {
+      // Cập nhật profile card chỉ sau khi lưu thành công
+      setProfile((p) => ({ ...p, ...formData }));
+      // Cập nhật session để sidebar đổi tên ngay
+      await update({ name: formData.name as string });
+      toast.success("Đã lưu thông tin!");
+    } else {
+      toast.error("Lỗi cập nhật");
+    }
   };
+
+  const handleReset = () => setFormData(profile);
 
   const handlePwChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,8 +311,8 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">Họ và tên</Label>
                 <Input
-                  value={(profile.name as string) || ""}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  value={(formData.name as string) || ""}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Nguyễn Văn A"
                   className="bg-zinc-800/50 border-zinc-700"
                 />
@@ -309,8 +321,8 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">Trường</Label>
                 <Input
-                  value={(profile.school as string) || ""}
-                  onChange={(e) => setProfile({ ...profile, school: e.target.value })}
+                  value={(formData.school as string) || ""}
+                  onChange={(e) => setFormData({ ...formData, school: e.target.value })}
                   placeholder="Đại học Bách Khoa..."
                   className="bg-zinc-800/50 border-zinc-700"
                 />
@@ -319,8 +331,8 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">Ngành học</Label>
                 <Input
-                  value={(profile.major as string) || ""}
-                  onChange={(e) => setProfile({ ...profile, major: e.target.value })}
+                  value={(formData.major as string) || ""}
+                  onChange={(e) => setFormData({ ...formData, major: e.target.value })}
                   placeholder="Khoa học Máy tính..."
                   className="bg-zinc-800/50 border-zinc-700"
                 />
@@ -329,8 +341,8 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">Năm học</Label>
                 <Select
-                  value={profile.yearOfStudy ? String(profile.yearOfStudy) : ""}
-                  onValueChange={(v) => setProfile({ ...profile, yearOfStudy: parseInt(v) })}
+                  value={formData.yearOfStudy ? String(formData.yearOfStudy) : ""}
+                  onValueChange={(v) => setFormData({ ...formData, yearOfStudy: parseInt(v) })}
                 >
                   <SelectTrigger className="bg-zinc-800/50 border-zinc-700">
                     <SelectValue placeholder="Chọn năm học..." />
@@ -349,8 +361,8 @@ export default function ProfilePage() {
               <div className="space-y-2 sm:col-span-2">
                 <Label className="text-zinc-300">Lĩnh vực IT quan tâm</Label>
                 <Select
-                  value={(profile.itField as string) || ""}
-                  onValueChange={(v) => setProfile({ ...profile, itField: v })}
+                  value={(formData.itField as string) || ""}
+                  onValueChange={(v) => setFormData({ ...formData, itField: v })}
                 >
                   <SelectTrigger className="bg-zinc-800/50 border-zinc-700 max-w-xs">
                     <SelectValue placeholder="Chọn lĩnh vực..." />
@@ -365,7 +377,16 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleReset}
+                disabled={saving}
+                className="text-zinc-400 hover:text-zinc-200"
+              >
+                Hủy
+              </Button>
               <Button
                 onClick={handleSave} disabled={saving}
                 className="bg-violet-600 hover:bg-violet-700 gap-2 min-w-[140px]"

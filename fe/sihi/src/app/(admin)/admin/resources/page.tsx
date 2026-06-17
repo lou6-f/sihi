@@ -39,7 +39,14 @@ import {
   ExternalLink,
   Search,
   Filter,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
+import { AnimatePresence } from "motion/react";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ─── Interfaces ─────────────────────────────────────────
 interface Resource {
@@ -51,6 +58,8 @@ interface Resource {
   field: string;
   level: string;
   status: string;
+  isAiGenerated: boolean;
+  relevanceScore?: number | null;
   createdAt: string;
 }
 
@@ -73,9 +82,9 @@ const STATUS_OPTIONS = [
 ] as const;
 
 const TYPE_OPTIONS = [
-  { value: "ARTICLE", label: "Bài viết" },
-  { value: "ROADMAP", label: "Roadmap" },
-  { value: "VIDEO", label: "Video" },
+  { value: "ARTICLE",       label: "Bài viết"      },
+  { value: "ROADMAP",       label: "Lộ trình"       },
+  { value: "VIDEO",         label: "Video"          },
   { value: "EXTERNAL_LINK", label: "Liên kết ngoài" },
 ] as const;
 
@@ -87,10 +96,16 @@ const FIELD_OPTIONS = [
 ] as const;
 
 const LEVEL_OPTIONS = [
-  { value: "BEGINNER", label: "Beginner" },
-  { value: "INTERMEDIATE", label: "Intermediate" },
-  { value: "ADVANCED", label: "Advanced" },
+  { value: "BEGINNER", label: "Cơ bản" },
+  { value: "INTERMEDIATE", label: "Trung bình" },
+  { value: "ADVANCED", label: "Nâng cao" },
 ] as const;
+
+const LEVEL_LABELS: Record<string, string> = {
+  BEGINNER: "Cơ bản",
+  INTERMEDIATE: "Trung bình",
+  ADVANCED: "Nâng cao",
+};
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-zinc-500/20 text-zinc-400",
@@ -120,9 +135,118 @@ export default function AdminResourcesPage() {
   // Dialog states
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const { confirm, ConfirmDialogUI } = useConfirmDialog();
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [formData, setFormData] = useState<ResourceFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+
+  // ─── AI Curator state ─────────────────────────────────────
+  const [curating, setCurating] = useState(false);
+  const [curateProgress, setCurateProgress] = useState("");
+  const [curateResult, setCurateResult] = useState<{
+    saved: number; pendingReview: number; skipped: number; durationMs: number;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleBulkDelete = async (status: string) => {
+    const statusLabel: Record<string, string> = {
+      ALL: "TẤT CẢ tài liệu trong hệ thống",
+      DRAFT: "nháp",
+      PENDING_REVIEW: "chờ duyệt",
+      PUBLISHED: "đã xuất bản",
+      ARCHIVED: "lưu trữ",
+    };
+    const label = statusLabel[status] || status;
+    const isRisky = status === "ALL" || status === "PUBLISHED";
+    const ok = await confirm(
+      `Xóa tất cả tài liệu ${label}?\nHành động này không thể hoàn tác.`,
+      { title: "Xóa hàng loạt", confirmLabel: "Xóa", danger: isRisky }
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const url = status === "ALL"
+        ? "/api/admin/resources"
+        : `/api/admin/resources?status=${status}`;
+      const res = await fetch(url, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Đã xóa ${data.deleted} tài liệu`);
+        // Optimistic: xóa khỏi state ngay, không reload
+        if (status === "ALL") {
+          setResources([]);
+          setTotalPages(1);
+          setPage(1);
+        } else {
+          setResources((prev) => prev.filter((r) => r.status !== status));
+        }
+      } else {
+        toast.error("Lỗi khi xóa tài liệu");
+      }
+    } catch {
+      toast.error("Lỗi kết nối server");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
+  const handleCurate = async () => {
+    if (curating) return;
+    setCurating(true);
+    setCurateResult(null);
+    setCurateProgress("Đang kết nối các nguồn...");
+    try {
+      const res = await fetch("/api/admin/curate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Chỉ dùng các nguồn tiếng Việt: Viblo, YouTube VN, freeCodeCamp VN, Roadmap
+          sources: ["viblo", "youtube", "freecodecamp", "roadmap"],
+          maxArticles: 15,
+        }),
+      });
+      if (!res.ok) { toast.error("Lỗi khi bắt đầu thu thập"); setCurating(false); return; }
+
+      const progressSteps = [
+        "Đang lấy bài từ Viblo.asia...",
+        "Đang lấy video YouTube tiếng Việt...",
+        "Đang lấy từ freeCodeCamp...",
+        "Đang phân tích bằng AI...",
+        "Đang lưu vào hàng đợi duyệt...",
+      ];
+      let stepIdx = 0;
+      setCurateProgress(progressSteps[0]);
+
+      // Poll status mỗi 4 giây
+      const poll = setInterval(async () => {
+        stepIdx = Math.min(stepIdx + 1, progressSteps.length - 1);
+        setCurateProgress(progressSteps[stepIdx]);
+
+        const statusRes = await fetch("/api/admin/curate");
+        const data = await statusRes.json();
+        if (data.status === "done") {
+          clearInterval(poll);
+          setCurating(false);
+          setCurateProgress("");
+          setCurateResult(data.result);
+          loadResources();
+          toast.success(`Thu thập xong! ${data.result.pendingReview} tài liệu đang chờ duyệt`);
+        } else if (data.status === "error") {
+          clearInterval(poll);
+          setCurating(false);
+          setCurateProgress("");
+          toast.error("Lỗi khi thu thập tài liệu");
+        }
+      }, 4000);
+    } catch {
+      toast.error("Lỗi kết nối server");
+      setCurating(false);
+      setCurateProgress("");
+    }
+  };
 
   // ─── Data Fetching ──────────────────────────────────
   const loadResources = useCallback(() => {
@@ -161,10 +285,16 @@ export default function AdminResourcesPage() {
         body: JSON.stringify(formData),
       });
       if (res.ok) {
+        const created = await res.json();
         toast.success("Tạo tài liệu thành công");
         setShowAddDialog(false);
         setFormData(EMPTY_FORM);
-        loadResources();
+        // Optimistic: thêm vào đầu danh sách, không reload
+        if (created.resource) {
+          setResources((prev) => [created.resource, ...prev]);
+        } else {
+          loadResources();
+        }
       } else {
         const err = await res.json();
         toast.error(err.error || "Lỗi tạo tài liệu");
@@ -188,8 +318,13 @@ export default function AdminResourcesPage() {
       if (res.ok) {
         toast.success("Cập nhật thành công");
         setShowEditDialog(false);
+        // Optimistic: cập nhật item tại chỗ, không reload
+        setResources((prev) =>
+          prev.map((r) =>
+            r.id === editingResource.id ? { ...r, ...formData } : r
+          )
+        );
         setEditingResource(null);
-        loadResources();
       } else {
         toast.error("Lỗi cập nhật tài liệu");
       }
@@ -201,14 +336,17 @@ export default function AdminResourcesPage() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Bạn có chắc muốn xóa tài liệu "${title}"?`)) return;
+    const ok = await confirm(`Bạn muốn xóa tài liệu “${title}”?`, {
+      title: "Xóa tài liệu",
+      confirmLabel: "Xóa",
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      const res = await fetch(`/api/admin/resources/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/admin/resources/${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Đã xóa tài liệu");
-        loadResources();
+        setResources((prev) => prev.filter((r) => r.id !== id));
       } else {
         toast.error("Lỗi xóa tài liệu");
       }
@@ -218,6 +356,11 @@ export default function AdminResourcesPage() {
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
+    // Optimistic update ngay lập tức
+    setResources((prev) =>
+      prev.map((r) => r.id === id ? { ...r, status: newStatus } : r)
+    );
+    setApprovingIds((prev) => new Set(prev).add(id));
     try {
       const res = await fetch(`/api/admin/resources/${id}`, {
         method: "PATCH",
@@ -225,13 +368,22 @@ export default function AdminResourcesPage() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
-        toast.success("Cập nhật trạng thái thành công");
-        loadResources();
+        const label =
+          newStatus === "PUBLISHED" ? "Tài liệu đã được duyệt" :
+          newStatus === "ARCHIVED"  ? "Tài liệu đã lưu trữ" :
+          newStatus === "DRAFT"     ? "Đưa về nhuầp" :
+          "Cập nhật trạng thái thành công";
+        toast.success(label);
       } else {
+        // Rollback nếu thất bại
         toast.error("Lỗi cập nhật trạng thái");
+        loadResources();
       }
     } catch {
       toast.error("Lỗi kết nối server");
+      loadResources();
+    } finally {
+      setApprovingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
     }
   };
 
@@ -346,14 +498,16 @@ export default function AdminResourcesPage() {
     </div>
   );
 
-  // ─── Render ─────────────────────────────────────────
+  // ─── Render ─────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="flex items-start justify-between gap-4"
       >
+        {/* Tiêu đề */}
         <div>
           <h1 className="text-3xl font-bold">Quản lý tài liệu</h1>
           <p className="mt-1 text-sm text-zinc-400">
@@ -361,24 +515,77 @@ export default function AdminResourcesPage() {
           </p>
         </div>
 
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
+        {/* Nhóm nút hành động */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Xóa tất cả — luôn hiện */}
+          <Button
+            variant="outline"
+            className="border-red-800/50 text-red-400 hover:border-red-600 hover:bg-red-500/10 hover:text-red-300"
+            onClick={() => handleBulkDelete(statusFilter)}
+            disabled={deleting || resources.length === 0}
+          >
+            {deleting
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <Trash2 className="mr-2 h-4 w-4" />}
+            Xóa tất cả
+          </Button>
+
+          {/* Thu thập tự động — hành động phụ */}
+          <div className="flex flex-col items-end gap-1">
             <Button
-              className="bg-violet-600 hover:bg-violet-700"
-              onClick={() => setFormData(EMPTY_FORM)}
+              variant="outline"
+              className="border-zinc-700 text-zinc-300 hover:border-violet-500/60 hover:bg-violet-500/10 hover:text-violet-300"
+              onClick={handleCurate}
+              disabled={curating}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Thêm tài liệu
+              {curating
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Sparkles className="mr-2 h-4 w-4" />}
+              {curating ? "Đang thu thập..." : "Thu thập tự động"}
             </Button>
-          </DialogTrigger>
-          <DialogContent className="border-zinc-800 bg-zinc-900 sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Thêm tài liệu mới</DialogTitle>
-            </DialogHeader>
-            <ResourceForm onSubmit={handleCreate} submitLabel="Tạo tài liệu" />
-          </DialogContent>
-        </Dialog>
+            {curating && curateProgress && (
+              <p className="text-xs text-violet-400 animate-pulse">{curateProgress}</p>
+            )}
+          </div>
+
+          {/* Thêm tài liệu — hành động chính */}
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button
+                className="bg-violet-600 hover:bg-violet-700"
+                onClick={() => setFormData(EMPTY_FORM)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Thêm tài liệu
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="border-zinc-800 bg-zinc-900 sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Thêm tài liệu mới</DialogTitle>
+              </DialogHeader>
+              <ResourceForm onSubmit={handleCreate} submitLabel="Tạo tài liệu" />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
+
+      {/* Kết quả curation */}
+      <AnimatePresence>
+        {curateResult && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
+              <Sparkles className="h-4 w-4 text-violet-400 shrink-0" />
+              <span className="text-sm text-violet-300 font-medium">Kết quả lần cuối:</span>
+              <Badge className="bg-yellow-500/20 text-yellow-400 text-xs">⏳ {curateResult.pendingReview} chờ duyệt</Badge>
+              <Badge className="bg-zinc-500/20 text-zinc-400 text-xs">✗ {curateResult.skipped} bỏ qua</Badge>
+              <span className="ml-auto text-xs text-zinc-500">{Math.round(curateResult.durationMs / 1000)}s</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filters */}
       <motion.div
@@ -396,28 +603,26 @@ export default function AdminResourcesPage() {
             className="pl-10"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-zinc-400" />
-          {STATUS_OPTIONS.map((s) => (
-            <Button
-              key={s.value}
-              variant={statusFilter === s.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setStatusFilter(s.value);
-                setPage(1);
-              }}
-              className={
-                statusFilter === s.value
-                  ? "bg-violet-600 hover:bg-violet-700"
-                  : "border-zinc-700 text-zinc-400 hover:text-zinc-200"
-              }
-            >
-              {s.label}
-            </Button>
-          ))}
-        </div>
+
+        {/* Dropdown bộ lọc trạng thái */}
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => { setStatusFilter(v); setPage(1); }}
+        >
+          <SelectTrigger className="w-[160px] border-zinc-700 bg-zinc-900">
+            <Filter className="mr-2 h-3.5 w-3.5 text-zinc-400" />
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent className="border-zinc-800 bg-zinc-900">
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </motion.div>
+
 
       {/* Table */}
       {loading ? (
@@ -465,8 +670,15 @@ export default function AdminResourcesPage() {
                           className="border-zinc-800/50 hover:bg-zinc-800/30"
                         >
                           <TableCell className="max-w-[250px] font-medium">
-                            <div className="truncate" title={resource.title}>
-                              {resource.title}
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate" title={resource.title}>
+                                {resource.title}
+                              </span>
+                              {resource.isAiGenerated && (
+                                <span title={`AI thu thập · Độ liên quan: ${resource.relevanceScore ?? "?"}/100`}>
+                                  <Sparkles className="h-3 w-3 shrink-0 text-violet-400" />
+                                </span>
+                              )}
                             </div>
                             {resource.description && (
                               <p className="mt-0.5 truncate text-xs text-zinc-500">
@@ -485,41 +697,50 @@ export default function AdminResourcesPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-zinc-300">
-                            {resource.level}
+                            {LEVEL_LABELS[resource.level] || resource.level}
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={resource.status}
-                              onValueChange={(v) =>
-                                handleStatusChange(resource.id, v)
-                              }
+                            <Badge
+                              className={`text-xs ${
+                                STATUS_COLORS[resource.status] ||
+                                "bg-zinc-500/20 text-zinc-400"
+                              }`}
                             >
-                              <SelectTrigger className="h-7 w-[130px] border-0 p-0">
-                                <Badge
-                                  className={`${
-                                    STATUS_COLORS[resource.status] ||
-                                    "bg-zinc-500/20 text-zinc-400"
-                                  } text-xs`}
-                                >
-                                  {getStatusLabel(resource.status)}
-                                </Badge>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS.filter((s) => s.value !== "ALL").map(
-                                  (s) => (
-                                    <SelectItem key={s.value} value={s.value}>
-                                      {s.label}
-                                    </SelectItem>
-                                  )
-                                )}
-                              </SelectContent>
-                            </Select>
+                              {getStatusLabel(resource.status)}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-zinc-400">
                             {formatDate(resource.createdAt)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
+                              {/* Nút Duyệt / Từ chối — chỉ hiện khi PENDING_REVIEW */}
+                              {resource.status === "PENDING_REVIEW" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleStatusChange(resource.id, "PUBLISHED")}
+                                    title="Duyệt — Xuất bản ngay"
+                                    disabled={approvingIds.has(resource.id)}
+                                    className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                                  >
+                                    {approvingIds.has(resource.id)
+                                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                                      : <CheckCircle2 className="h-4 w-4" />}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleStatusChange(resource.id, "ARCHIVED")}
+                                    title="Từ chối — Lưu trữ"
+                                    disabled={approvingIds.has(resource.id)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -595,6 +816,8 @@ export default function AdminResourcesPage() {
           <ResourceForm onSubmit={handleEdit} submitLabel="Lưu thay đổi" />
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+      <ConfirmDialogUI />
+    </>
   );
 }

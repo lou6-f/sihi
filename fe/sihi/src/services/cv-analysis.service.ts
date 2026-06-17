@@ -95,6 +95,11 @@ export class CVAnalysisService {
         userId: input.userId,
       });
       analysis = result;
+      // Lưu session_id để dùng cho evaluation KG sau này
+      await this.prisma.cV.update({
+        where: { id: input.cvId },
+        data: { cvModuleSessionId: sessionId },
+      });
     } else {
       // Fallback: Gemini trực tiếp (không có MinerU, không có KG)
       console.log("[CVAnalysis] cv-module not available, falling back to Gemini direct");

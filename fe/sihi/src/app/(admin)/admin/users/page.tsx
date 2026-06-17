@@ -6,7 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Ban, CheckCircle } from "lucide-react";
+import { Search, MoreHorizontal, ShieldCheck, ShieldOff } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 export default function AdminUsersPage() {
@@ -54,7 +58,7 @@ export default function AdminUsersPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-zinc-800 text-left text-zinc-400">
-                  <th className="p-4">Tên</th><th className="p-4">Email</th><th className="p-4">Role</th>
+                  <th className="p-4">Tên</th><th className="p-4">Email</th><th className="p-4">Vai trò</th>
                   <th className="p-4">PV</th><th className="p-4">Trạng thái</th><th className="p-4">Hành động</th>
                 </tr></thead>
                 <tbody>
@@ -62,17 +66,40 @@ export default function AdminUsersPage() {
                     <tr key={u.id as string} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                       <td className="p-4 font-medium">{u.name as string}</td>
                       <td className="p-4 text-zinc-400">{u.email as string}</td>
-                      <td className="p-4"><Badge variant="secondary">{u.role as string}</Badge></td>
+                      <td className="p-4"><Badge variant="secondary">{{ ADMIN: "Quản trị", USER: "Người dùng" }[u.role as string] ?? (u.role as string)}</Badge></td>
                       <td className="p-4">{((u._count as Record<string, number>)?.interviews) ?? 0}</td>
                       <td className="p-4">
                         <Badge className={u.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}>
-                          {u.isActive ? "Active" : "Disabled"}
+                          {u.isActive ? "Đang hoạt động" : "Vô hiệu hóa"}
                         </Badge>
                       </td>
-                      <td className="p-4">
-                        <Button variant="ghost" size="sm" onClick={() => toggleActive(u.id as string, u.isActive as boolean)}>
-                          {u.isActive ? <Ban className="h-4 w-4 text-red-400" /> : <CheckCircle className="h-4 w-4 text-green-400" />}
-                        </Button>
+                      <td className="p-4 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900">
+                            {u.isActive ? (
+                              <DropdownMenuItem
+                                className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer"
+                                onClick={() => toggleActive(u.id as string, u.isActive as boolean)}
+                              >
+                                <ShieldOff className="mr-2 h-4 w-4" />
+                                Vô hiệu hóa tài khoản
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                className="text-green-400 focus:text-green-300 focus:bg-green-500/10 cursor-pointer"
+                                onClick={() => toggleActive(u.id as string, u.isActive as boolean)}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Kích hoạt tài khoản
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}

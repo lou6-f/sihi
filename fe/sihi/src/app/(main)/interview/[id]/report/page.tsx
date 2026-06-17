@@ -72,6 +72,16 @@ export default function ReportPage() {
 
   useEffect(() => {
     let stepTimers: NodeJS.Timeout[] = [];
+    let generationTriggered = false;
+
+    const triggerGeneration = async () => {
+      if (generationTriggered) return;
+      generationTriggered = true;
+      try {
+        await fetch(`/api/interviews/${id}/report`, { method: "POST" });
+      } catch {}
+    };
+
     const fetchReport = async () => {
       try {
         const r = await fetch(`/api/interviews/${id}/report`);
@@ -83,6 +93,8 @@ export default function ReportPage() {
           setLoading(false);
           return true;
         }
+        // Chưa có report → trigger generation nếu chưa làm
+        if (r.status === 404) await triggerGeneration();
       } catch {}
       return false;
     };

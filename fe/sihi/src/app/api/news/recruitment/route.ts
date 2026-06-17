@@ -9,26 +9,60 @@ export interface NewsItem {
   dateLabel: string;
   url: string;
   image: string | null;
-  company: "FPT" | "Viettel" | "VNG";
+  company: "FPT" | "Viettel" | "VNG" | "VinGroup" | "VNPT" | "MoMo" | "Techcombank" | "MB" | "Tiki" | "Shopee" | "TopDev";
 }
 
-// ─── Vietnamese news RSS sources (have images in feed directly) ─
+// ─── Nguồn báo chí tổng hợp ─ cần lọc công ty + tuyển dụng ───
 const RSS_SOURCES = [
-  { url: "https://vnexpress.net/rss/kinh-doanh.rss",     name: "VnExpress" },
-  { url: "https://vnexpress.net/rss/so-hoa.rss",         name: "VnExpress" },
-  { url: "https://cafef.vn/rss/doanh-nghiep.rss",        name: "CafeF" },
-  { url: "https://cafef.vn/rss/nhan-su-tuyen-dung.rss",  name: "CafeF" },
-  { url: "https://vietnamnet.vn/rss/kinh-doanh.rss",     name: "VietnamNet" },
-  { url: "https://baodautu.vn/rss/nhan-su.rss",          name: "Báo Đầu Tư" },
+  { url: "https://vnexpress.net/rss/kinh-doanh.rss",        name: "VnExpress"   },
+  { url: "https://vnexpress.net/rss/so-hoa.rss",            name: "VnExpress"   },
+  { url: "https://cafef.vn/rss/doanh-nghiep.rss",           name: "CafeF"       },
+  { url: "https://vietnamnet.vn/rss/kinh-doanh.rss",        name: "VietnamNet"  },
+  { url: "https://tuoitre.vn/rss/kinh-te.rss",              name: "Tuổi Trẻ"   },
+  { url: "https://tuoitre.vn/rss/nhip-song-so.rss",         name: "Tuổi Trẻ"   },
+  { url: "https://thanhnien.vn/rss/pages/home.rss",         name: "Thanh Niên" },
+  { url: "https://thanhnien.vn/rss/pages/kinh-te.rss",      name: "Thanh Niên" },
+  { url: "https://dantri.com.vn/rss/kinh-doanh.rss",        name: "Dân Trí"    },
+  { url: "https://zingnews.vn/kinh-doanh.rss",              name: "Zing News"  },
+  { url: "https://zingnews.vn/cong-nghe.rss",               name: "Zing News"  },
+  { url: "https://nld.com.vn/rss/kinh-te.rss",              name: "NLĐ"        },
+  { url: "https://laodong.vn/rss/kinh-te.rss",              name: "Lao Động"  },
+  { url: "https://tienphong.vn/rss/kinh-te.rss",            name: "Tiền Phong" },
+];
+
+/**
+ * Nguồn CHUYÊN tuyển dụng / việc làm — tin tưởng, bỏ qua lọc tên công ty.
+ * Chỉ cần từ khóa tuyển dụng trong tiêu đề là được lấy.
+ */
+const TRUSTED_RECRUITMENT_SOURCES = [
+  // ── Feed chuyên nhân sự / việc làm ───────────────────────────────────
+  { url: "https://cafef.vn/rss/nhan-su-tuyen-dung.rss",    name: "CafeF"      },
+  { url: "https://baodautu.vn/rss/nhan-su.rss",            name: "Báo Đầu Tư" },
+  { url: "https://dantri.com.vn/rss/viec-lam.rss",         name: "Dân Trí"    },
+  { url: "https://nld.com.vn/rss/viec-lam.rss",            name: "NLĐ"        },
+  // ── Nền tảng IT/tuyển dụng ────────────────────────────────────────
+  { url: "https://topdev.vn/blog/feed/rss",                name: "TopDev"     },
 ];
 
 // Keywords → company mapping (check in title or description)
 const COMPANY_KEYWORDS: { keyword: string; company: NewsItem["company"] }[] = [
-  { keyword: "fpt",      company: "FPT" },
-  { keyword: "viettel",  company: "Viettel" },
-  { keyword: "vng",      company: "VNG" },
-  { keyword: "zalo",     company: "VNG" },
-  { keyword: "zalopay",  company: "VNG" },
+  { keyword: "fpt",          company: "FPT"         },
+  { keyword: "viettel",      company: "Viettel"     },
+  { keyword: "vng",          company: "VNG"         },
+  { keyword: "zalo",         company: "VNG"         },
+  { keyword: "zalopay",      company: "VNG"         },
+  { keyword: "vingroup",     company: "VinGroup"    },
+  { keyword: "vinfast",      company: "VinGroup"    },
+  { keyword: "vinhomes",     company: "VinGroup"    },
+  { keyword: "vnpt",         company: "VNPT"        },
+  { keyword: "momo",         company: "MoMo"        },
+  { keyword: "m_service",    company: "MoMo"        },
+  { keyword: "techcombank",  company: "Techcombank" },
+  { keyword: "mb bank",      company: "MB"          },
+  { keyword: "mbbank",       company: "MB"          },
+  { keyword: "tiki",         company: "Tiki"        },
+  { keyword: "shopee",       company: "Shopee"      },
+  { keyword: "sea limited",  company: "Shopee"      },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -49,6 +83,26 @@ function detectCompany(text: string): NewsItem["company"] | null {
     if (lower.includes(keyword)) return company;
   }
   return null;
+}
+
+// Từ khóa đặc trưng tuyển dụng — CHỈ check tiêu đề để tránh false positive
+const RECRUITMENT_KEYWORDS = [
+  // Tiếng Việt — cụm từ rõ ràng
+  "tuyển dụng", "tuyển nhân viên", "tuyển kỹ sư", "tuyển lập trình viên",
+  "tuyển thực tập", "thực tập sinh", "việc làm", "ứng viên",
+  "cơ hội nghề nghiệp", "tuyển mới", "nhân sự mới",
+  "chính sách tuyển", "nhu cầu tuyển", "mở rộng nhân lực",
+  "tăng lương", "chính sách lương", "lương thưởng nhân viên",
+  "sa thải", "cắt giảm nhân sự", "thưởng tết nhân viên",
+  // Tiếng Anh
+  "hiring", "recruitment", "job opening", "internship", "layoff",
+  "workforce", "employees", "job fair",
+];
+
+/** Kiểm tra TIÊU ĐỀ có liên quan tới tuyển dụng không (không check description) */
+function isRecruitmentRelated(title: string): boolean {
+  const lower = title.toLowerCase();
+  return RECRUITMENT_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 /** Extract first image src from HTML content (handles both quoted and unquoted, CDATA) */
@@ -137,21 +191,53 @@ export const revalidate = 1800;
 
 export async function GET() {
   try {
-    // Fetch all RSS sources in parallel
-    const allResults = await Promise.all(
-      RSS_SOURCES.map((s) => fetchFeed(s.url, s.name))
-    );
+    // Fetch song song: nguồn báo chí + nguồn tuyển dụng chuyên biệt
+    const [generalResults, trustedResults] = await Promise.all([
+      Promise.all(RSS_SOURCES.map((s) => fetchFeed(s.url, s.name))),
+      Promise.all(TRUSTED_RECRUITMENT_SOURCES.map((s) => fetchFeed(s.url, s.name))),
+    ]);
 
-    // Flatten and filter by company keywords
     const seenUrls = new Set<string>();
     const matched: NewsItem[] = [];
 
-    for (const articles of allResults) {
+    // ── Nguồn CHUYÊN tuyển dụng: lấy tất cả (viec-lam, nhan-su feed) ──────
+    // TopDev là blog IT → vẫn cần lọc từ khóa để bỏ bài không liên quan
+    const BLOG_TRUSTED = new Set(["TopDev"]); // Nguồn blog cần check từ khóa
+    for (const [i, articles] of trustedResults.entries()) {
+      const sourceName = TRUSTED_RECRUITMENT_SOURCES[i].name;
+      const isBlog = BLOG_TRUSTED.has(sourceName);
+      for (const art of articles) {
+        if (seenUrls.has(art.url)) continue;
+        // Blog sources (TopDev) cần từ khóa tuyển dụng; feed viec-lam/nhan-su lấy hết
+        if (isBlog && !isRecruitmentRelated(art.title)) continue;
+
+        seenUrls.add(art.url);
+        const fullText = art.title + " " + art.description;
+        const company = detectCompany(fullText) ?? sourceName as NewsItem["company"];
+        matched.push({
+          id: `trusted-${Buffer.from(art.url).toString("base64").slice(0, 32)}`,
+          title: art.title,
+          source: art.source,
+          date: art.date,
+          dateLabel: timeLabel(art.date),
+          url: art.url,
+          image: art.image,
+          company,
+        });
+      }
+    }
+
+    // ── Nguồn báo chí: cần cả tên công ty VÀ từ khóa tuyển dụng ──
+    for (const articles of generalResults) {
       for (const art of articles) {
         if (seenUrls.has(art.url)) continue;
 
-        const company = detectCompany(art.title + " " + art.description);
+        const fullText = art.title + " " + art.description;
+        const company = detectCompany(fullText);
         if (!company) continue;
+
+        // Chỉ lấy bài có từ khóa tuyển dụng rõ ràng trong tiêu đề
+        if (!isRecruitmentRelated(art.title)) continue;
 
         seenUrls.add(art.url);
         matched.push({
@@ -167,13 +253,13 @@ export async function GET() {
       }
     }
 
-    // Sort by date desc, take top 10
+    // Sort by date desc, take top 12
     const items = matched
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10);
+      .slice(0, 12);
 
     return NextResponse.json({ items }, {
-      headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch {
     return NextResponse.json({ items: [] }, { status: 500 });

@@ -14,7 +14,9 @@ interface Interview { id: string; field: string; level: string; status: string; 
 
 const FIELD_LABELS: Record<string, string> = { FRONTEND: "Frontend", BACKEND: "Backend", DATA: "Data", FULLSTACK: "Fullstack" };
 
-const isCompleted = (status: string) => status === "COMPLETED";
+const isCompleted  = (s: string) => s === "COMPLETED";
+const isAbandoned  = (s: string) => s === "ABANDONED" || s === "CANCELLED" || s === "ERROR";
+const isInProgress = (s: string) => !isCompleted(s) && !isAbandoned(s);
 
 
 export default function HistoryPage() {
@@ -65,35 +67,50 @@ export default function HistoryPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((iv, i) => {
-            const done = isCompleted(iv.status);
+            const done    = isCompleted(iv.status);
+            const abandoned = isAbandoned(iv.status);
+            const inProg  = isInProgress(iv.status);
+
+            // Link: COMPLETED → report, in-progress → session, abandoned → no link
+            const href = done ? `/interview/${iv.id}/report`
+              : inProg ? `/interview/${iv.id}/session`
+              : null;
+
+            const card = (
+              <Card className={`glass border-0 ${href ? "glass-hover cursor-pointer" : "opacity-70"}`}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
+                      done ? "bg-violet-500/20 text-violet-400"
+                      : abandoned ? "bg-zinc-800 text-zinc-600"
+                      : "bg-blue-500/20 text-blue-400"
+                    }`}>
+                      {done ? (iv.totalScore != null ? iv.totalScore : "—") : "—"}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-base">{FIELD_LABELS[iv.field]} · {iv.level}</h3>
+                      <p className="text-sm text-zinc-500">{new Date(iv.createdAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={
+                      done ? "bg-green-500/20 text-green-400"
+                      : abandoned ? "bg-zinc-500/20 text-zinc-500"
+                      : "bg-blue-500/20 text-blue-400"
+                    }>
+                      {done ? "✅ Hoàn thành"
+                        : abandoned ? "⚪ Bỏ dở"
+                        : "🔄 Đang diễn ra"}
+                    </Badge>
+                    {href && <ChevronRight className="h-4 w-4 text-zinc-500" />}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+
             return (
               <motion.div key={iv.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                <Link href={done ? `/interview/${iv.id}/report` : `/interview/${iv.id}/session`}>
-                  <Card className="glass glass-hover cursor-pointer border-0">
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold ${
-                          done ? "bg-violet-500/20 text-violet-400" : "bg-zinc-800 text-zinc-600"
-                        }`}>
-                          {done ? (iv.totalScore != null ? iv.totalScore : "—") : "—"}
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-base">{FIELD_LABELS[iv.field]} · {iv.level}</h3>
-                          <p className="text-sm text-zinc-500">{new Date(iv.createdAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={done
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-zinc-500/20 text-zinc-400"
-                        }>
-                          {done ? "Hoàn thành" : "Chưa hoàn thành"}
-                        </Badge>
-                        <ChevronRight className="h-4 w-4 text-zinc-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                {href ? <Link href={href}>{card}</Link> : card}
               </motion.div>
             );
           })}

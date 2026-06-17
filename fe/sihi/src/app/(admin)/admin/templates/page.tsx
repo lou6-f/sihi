@@ -17,14 +17,13 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
-  Settings2,
-  Search,
-  Plus,
-  CheckCircle,
-  XCircle,
-  Layers,
-  Clock,
+  Settings2, Search, Plus, CheckCircle, XCircle,
+  Layers, Clock, MoreHorizontal, Pencil,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ─── Interfaces ─────────────────────────────────────────
 interface TemplateSection {
@@ -50,9 +49,9 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 const LEVEL_LABELS: Record<string, string> = {
-  INTERN: "Intern",
-  FRESHER: "Fresher",
-  JUNIOR: "Junior",
+  INTERN:   "Thực tập sinh",
+  FRESHER:  "Fresher",
+  JUNIOR:   "Junior",
 };
 
 const FIELD_COLORS: Record<string, string> = {
@@ -77,135 +76,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   BEHAVIORAL: "Hành vi",
 };
 
-// ─── Initial Data ───────────────────────────────────────
-const INITIAL_TEMPLATES: Template[] = [
-  {
-    id: "tmpl-fe-intern",
-    field: "FRONTEND",
-    level: "INTERN",
-    questionCount: 8,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 3 },
-      { category: "TECHNICAL", questionCount: 3 },
-      { category: "BEHAVIORAL", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-fe-fresher",
-    field: "FRONTEND",
-    level: "FRESHER",
-    questionCount: 10,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 2 },
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "PROJECT", questionCount: 2 },
-      { category: "BEHAVIORAL", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-fe-junior",
-    field: "FRONTEND",
-    level: "JUNIOR",
-    questionCount: 12,
-    isActive: true,
-    sections: [
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "PROJECT", questionCount: 3 },
-      { category: "ALGORITHM", questionCount: 2 },
-      { category: "SITUATIONAL", questionCount: 3 },
-    ],
-  },
-  {
-    id: "tmpl-be-intern",
-    field: "BACKEND",
-    level: "INTERN",
-    questionCount: 8,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 3 },
-      { category: "TECHNICAL", questionCount: 3 },
-      { category: "BEHAVIORAL", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-be-fresher",
-    field: "BACKEND",
-    level: "FRESHER",
-    questionCount: 10,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 2 },
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "PROJECT", questionCount: 2 },
-      { category: "ALGORITHM", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-be-junior",
-    field: "BACKEND",
-    level: "JUNIOR",
-    questionCount: 12,
-    isActive: false,
-    sections: [
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "PROJECT", questionCount: 3 },
-      { category: "ALGORITHM", questionCount: 3 },
-      { category: "SITUATIONAL", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-data-intern",
-    field: "DATA",
-    level: "INTERN",
-    questionCount: 8,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 3 },
-      { category: "TECHNICAL", questionCount: 3 },
-      { category: "BEHAVIORAL", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-data-fresher",
-    field: "DATA",
-    level: "FRESHER",
-    questionCount: 10,
-    isActive: true,
-    sections: [
-      { category: "FOUNDATION", questionCount: 2 },
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "ALGORITHM", questionCount: 2 },
-      { category: "PROJECT", questionCount: 2 },
-    ],
-  },
-  {
-    id: "tmpl-fs-intern",
-    field: "FULLSTACK",
-    level: "INTERN",
-    questionCount: 10,
-    isActive: false,
-    sections: [
-      { category: "FOUNDATION", questionCount: 3 },
-      { category: "TECHNICAL", questionCount: 4 },
-      { category: "BEHAVIORAL", questionCount: 3 },
-    ],
-  },
-  {
-    id: "tmpl-fs-fresher",
-    field: "FULLSTACK",
-    level: "FRESHER",
-    questionCount: 12,
-    isActive: false,
-    sections: [
-      { category: "FOUNDATION", questionCount: 2 },
-      { category: "TECHNICAL", questionCount: 5 },
-      { category: "PROJECT", questionCount: 3 },
-      { category: "SITUATIONAL", questionCount: 2 },
-    ],
-  },
-];
+
 
 // ─── Component ──────────────────────────────────────────
 export default function AdminTemplatesPage() {
@@ -216,23 +87,58 @@ export default function AdminTemplatesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading from data store
-    const timer = setTimeout(() => {
-      setTemplates(INITIAL_TEMPLATES);
-      setLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
+    fetch("/api/admin/templates")
+      .then((r) => r.json())
+      .then((data: Array<{
+        id: string; field: string; level: string;
+        questionCount: number; isActive: boolean;
+        sections: Array<{ category: string; questionCount: number }>;
+      }>) => {
+        setTemplates(
+          data.map((t) => ({
+            id: t.id,
+            field: t.field,
+            level: t.level,
+            questionCount: t.questionCount,
+            isActive: t.isActive,
+            sections: (t.sections || []).map((s) => ({
+              category: s.category,
+              questionCount: s.questionCount,
+            })),
+          }))
+        );
+      })
+      .catch(() => {
+        // fallback: không có data
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const toggleActive = (id: string) => {
-    setTemplates((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, isActive: !t.isActive } : t))
-    );
+  const toggleActive = async (id: string) => {
     const template = templates.find((t) => t.id === id);
-    if (template) {
-      toast.success(
-        template.isActive ? "Đã vô hiệu hóa template" : "Đã kích hoạt template"
+    if (!template) return;
+
+    const newValue = !template.isActive;
+
+    // Optimistic update
+    setTemplates((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, isActive: newValue } : t))
+    );
+
+    try {
+      const res = await fetch(`/api/admin/templates/${id}/toggle`, {
+        method: "POST",
+      });
+
+      if (!res.ok) throw new Error("API error");
+
+      toast.success(newValue ? "Đã kích hoạt template" : "Đã vô hiệu hóa template");
+    } catch {
+      // Rollback nếu lỗi
+      setTemplates((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, isActive: !newValue } : t))
       );
+      toast.error("Không thể cập nhật trạng thái template");
     }
   };
 
@@ -291,9 +197,9 @@ export default function AdminTemplatesPage() {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Interview Templates</h1>
+            <h1 className="text-3xl font-bold">Khung phỏng vấn</h1>
             <p className="mt-1 text-sm text-zinc-400">
-              Quản lý cấu trúc phỏng vấn theo lĩnh vực và cấp độ
+              Quản lý khung phỏng vấn theo lĩnh vực và cấp độ
             </p>
           </div>
           <Button
@@ -506,40 +412,40 @@ export default function AdminTemplatesPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleActive(template.id)}
-                                title={
-                                  template.isActive
-                                    ? "Vô hiệu hóa"
-                                    : "Kích hoạt"
-                                }
-                              >
-                                {template.isActive ? (
-                                  <XCircle className="h-4 w-4 text-red-400" />
-                                ) : (
-                                  <CheckCircle className="h-4 w-4 text-green-400" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  toast.info(
-                                    "Tính năng chỉnh sửa template sắp ra mắt"
-                                  )
-                                }
-                              >
-                                <Badge
-                                  variant="outline"
-                                  className="border-violet-500/30 text-violet-400 text-[10px]"
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="border-zinc-800 bg-zinc-900">
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => toast.info("Tính năng chỉnh sửa đang phát triển")}
                                 >
-                                  Sắp ra mắt
-                                </Badge>
-                              </Button>
-                            </div>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Chỉnh sửa
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-zinc-800" />
+                                {template.isActive ? (
+                                  <DropdownMenuItem
+                                    className="text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer"
+                                    onClick={() => toggleActive(template.id)}
+                                  >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Vô hiệu hóa
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="text-green-400 focus:text-green-300 focus:bg-green-500/10 cursor-pointer"
+                                    onClick={() => toggleActive(template.id)}
+                                  >
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    Kích hoạt
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </motion.tr>
                       ))
@@ -564,7 +470,7 @@ export default function AdminTemplatesPage() {
               <Settings2 className="mt-0.5 h-5 w-5 text-violet-400" />
               <div>
                 <p className="text-sm font-medium text-zinc-200">
-                  Về Interview Templates
+                  Về Khung phỏng vấn
                 </p>
                 <p className="mt-1 text-xs text-zinc-400">
                   Mỗi template xác định cấu trúc phỏng vấn cho một lĩnh vực và

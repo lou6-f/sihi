@@ -59,3 +59,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation error" }, { status: 400 });
   }
 }
+
+/** DELETE /api/admin/resources?status=PENDING_REVIEW — Xóa hàng loạt theo trạng thái */
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || session.user.role !== "ADMIN")
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+
+    const where: Prisma.ResourceWhereInput = {};
+    if (status) {
+      where.status = status as Prisma.ResourceWhereInput["status"];
+    }
+
+    const { count } = await prisma.resource.deleteMany({ where });
+
+    return NextResponse.json({ deleted: count, message: `Đã xóa ${count} tài liệu` });
+  } catch (error) {
+    console.error("Bulk delete resources error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}

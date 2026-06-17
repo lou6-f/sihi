@@ -18,19 +18,23 @@ import { useInterviewGuard } from "@/contexts/interview-guard-context";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { InactivityDialog } from "@/components/interview/inactivity-dialog";
+
+const INACTIVITY_MS = 10 * 60 * 1000; // 10 phút
+const AUTO_ABANDON_S = 5 * 60;        // 5 phút countdown
 
 // ─── IT Tips for loading screen ──────────────────────────────────────────────
 const IT_TIPS = [
-  "React re-renders khi state thay đổi — useCallback và useMemo giúp tránh re-render không cần thiết.",
-  "HTTP/2 hỗ trợ multiplexing — nhiều request trên cùng 1 TCP connection, giảm latency đáng kể.",
-  "SQL Index hoạt động như mục lục sách — giúp database tìm dữ liệu mà không cần quét toàn bộ bảng.",
-  "JWT gồm 3 phần: Header.Payload.Signature — chỉ Signature là bí mật, Payload có thể decode mà không cần key.",
-  "Big O(n log n) là độ phức tạp tốt nhất có thể đạt được với thuật toán sắp xếp dựa trên so sánh.",
-  "Docker container chia sẻ kernel với host OS — nhẹ hơn VM nhưng cách ly ở mức OS process.",
-  "useState trong React là bất đồng bộ — không đọc state ngay sau khi gọi setState.",
-  "Deadlock xảy ra khi 2 process chờ nhau giải phóng resource — giải pháp: timeout hoặc thứ tự lock nhất quán.",
-  "CSS Flexbox xử lý layout 1 chiều, Grid xử lý layout 2 chiều — dùng đúng công cụ cho đúng bài toán.",
-  "CAP Theorem: hệ thống phân tán chỉ đảm bảo 2 trong 3: Consistency, Availability, Partition Tolerance.",
+  "useCallback và useMemo trong React giúp tránh re-render không cần thiết khi state thay đổi.",
+  "HTTP/2 hỗ trợ multiplexing, cho phép nhiều request chạy trên cùng một TCP connection, giảm đáng kể độ trễ.",
+  "Index trong SQL hoạt động giống mục lục sách, giúp database tìm dữ liệu mà không cần quét toàn bộ bảng.",
+  "JWT gồm 3 phần Header.Payload.Signature. Chỉ có Signature là bí mật, còn Payload có thể decode mà không cần key.",
+  "O(n log n) là độ phức tạp tốt nhất có thể đạt được với các thuật toán sắp xếp dựa trên so sánh.",
+  "Docker container chia sẻ kernel với host OS nên nhẹ hơn VM, nhưng vẫn đảm bảo cách ly ở mức OS process.",
+  "useState trong React hoạt động bất đồng bộ, vì vậy không nên đọc giá trị state ngay sau khi gọi setState.",
+  "Deadlock xảy ra khi hai process cùng chờ nhau giải phóng resource. Giải pháp là dùng timeout hoặc quy ước thứ tự lock nhất quán.",
+  "Flexbox xử lý layout theo một chiều còn Grid xử lý hai chiều. Chọn đúng công cụ sẽ giúp code CSS gọn và dễ bảo trì hơn.",
+  "CAP Theorem phát biểu rằng hệ thống phân tán chỉ đảm bảo được 2 trong 3 tính chất: Consistency, Availability và Partition Tolerance.",
 ];
 
 interface Message {
@@ -80,14 +84,29 @@ export default function InterviewSessionPage() {
   const [vocalWarning, setVocalWarning] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [showInactivityDialog, setShowInactivityDialog] = useState(false);
   const interviewActiveRef = useRef(false);
+  const isCompletedRef = useRef(false);
   const { setIsInInterview } = useInterviewGuard();
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * IT_TIPS.length));
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recordingStartRef = useRef<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSpokenIdRef = useRef<string>("");
+
+  // ─── Reset inactivity timer ────────────────────────────────────────────────────────
+  const resetInactivityTimer = useCallback(() => {
+    if (!interviewActiveRef.current || isCompletedRef.current) return;
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    setShowInactivityDialog(false);
+    inactivityTimerRef.current = setTimeout(() => {
+      if (interviewActiveRef.current && !isCompletedRef.current) {
+        setShowInactivityDialog(true);
+      }
+    }, INACTIVITY_MS);
+  }, []);
 
   // Loading steps for progress UI
   const LOADING_STEPS = useMemo(() => [
@@ -111,28 +130,41 @@ export default function InterviewSessionPage() {
     return () => { timers.forEach(clearTimeout); clearInterval(tipInterval); };
   }, [loading]);
 
-  // Navigation guard — prevent leaving mid-interview
+  // Tầng 3: sendBeacon + Navigation guard
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!interviewActiveRef.current) return;
+      if (!interviewActiveRef.current || isCompletedRef.current) return;
       e.preventDefault();
       e.returnValue = "Bạn đang trong phỏng vấn. Thoát ra sẽ mất tiến trình!";
+      // Tầng 3: gửi beacon để đánh dấu ABANDONED
+      navigator.sendBeacon(`/api/interviews/${id}/abandon`);
     };
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       if (!interviewActiveRef.current) return;
-      // Push state back to prevent navigation
       window.history.pushState(null, "", window.location.href);
       setShowExitModal(true);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("popstate", handlePopState);
-    // Push an extra state so popstate fires on first back
     window.history.pushState(null, "", window.location.href);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
+      // Cleanup inactivity timer
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     };
-  }, []);
+  }, [id]);
+
+  // Tầng 2: attach inactivity event listeners when interview starts
+  useEffect(() => {
+    if (!interviewActiveRef.current) return;
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    const handler = () => resetInactivityTimer();
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetInactivityTimer(); // start timer immediately
+    return () => events.forEach((e) => window.removeEventListener(e, handler));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interview, resetInactivityTimer]);
 
   // ─── TTS Hook ──────────────────────────────────────────────────────────────
   const { isSpeaking, supported: ttsSupported, speak, stop: stopSpeaking,
@@ -231,6 +263,7 @@ export default function InterviewSessionPage() {
         }
         interviewActiveRef.current = true;
         setIsInInterview(true);
+        resetInactivityTimer(); // ← start 10-min inactivity timer
 
         setLoading(false);
       } catch {
@@ -280,6 +313,7 @@ export default function InterviewSessionPage() {
     setInput("");
     setVocalWarning(null);
     setSending(true);
+    resetInactivityTimer(); // reset on every answer sent
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -316,6 +350,11 @@ export default function InterviewSessionPage() {
       if (result.vocalWarning) setVocalWarning(result.vocalWarning);
 
       if (result.isComplete) {
+        isCompletedRef.current = true;
+        interviewActiveRef.current = false;
+        setIsInInterview(false);
+        if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+        setShowInactivityDialog(false);
         const endMsg: Message = {
           id: `end-${Date.now()}`,
           role: "AI",
@@ -348,19 +387,33 @@ export default function InterviewSessionPage() {
     recordingStartRef.current = null;
   };
 
-  // ─── End interview ────────────────────────────────────────────────────────
+  // ─── End interview (manual / exit modal) ──────────────────────────────────
   const doEnd = async () => {
+    isCompletedRef.current = true;
     interviewActiveRef.current = false;
     setIsInInterview(false);
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    setShowInactivityDialog(false);
     stopSpeaking();
     if (isListening) stopListening();
     try {
       await fetch(`/api/interviews/${id}/end`, { method: "POST" });
-      fetch(`/api/interviews/${id}/report`, { method: "POST" }).catch(() => {});
+      await fetch(`/api/interviews/${id}/report`, { method: "POST" }).catch(() => {});
       router.push(`/interview/${id}/report`);
     } catch {
       router.push(`/interview/${id}/report`);
     }
+  };
+
+  // Tầng 2 handlers — InactivityDialog
+  const handleEndEarly = async () => {
+    setShowInactivityDialog(false);
+    toast.loading("Đang tạo báo cáo...");
+    await doEnd();
+  };
+  const handleContinueFromDialog = () => {
+    setShowInactivityDialog(false);
+    resetInactivityTimer();
   };
 
   const handleEnd = () => setShowExitModal(true);
@@ -430,7 +483,7 @@ export default function InterviewSessionPage() {
           className="rounded-lg bg-zinc-800/60 border border-zinc-700/50 px-4 py-3"
         >
           <p className="text-xs text-zinc-400 leading-relaxed">
-            <span className="text-violet-400 font-medium">💡 Tip: </span>
+            <span className="text-violet-400 font-medium">💡 Kiến thức: </span>
             {IT_TIPS[tipIndex]}
           </p>
         </motion.div>
@@ -762,6 +815,15 @@ export default function InterviewSessionPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Tầng 2: Inactivity Dialog ──────────────────────────────────── */}
+      <InactivityDialog
+        open={showInactivityDialog}
+        idleMinutes={10}
+        onContinue={handleContinueFromDialog}
+        onEndEarly={handleEndEarly}
+        autoAbandonSeconds={AUTO_ABANDON_S}
+      />
     </div>
   );
 }

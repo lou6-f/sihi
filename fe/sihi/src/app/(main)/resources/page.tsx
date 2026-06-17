@@ -13,6 +13,7 @@ interface Resource { id: string; title: string; description?: string; type: stri
 interface Recommendation { id: string; reason: string; resource: Resource; }
 
 const TYPE_LABELS: Record<string, string> = { ARTICLE: "Bài viết", ROADMAP: "Lộ trình", VIDEO: "Video", EXTERNAL_LINK: "Liên kết" };
+const LEVEL_LABELS: Record<string, string> = { BEGINNER: "Cơ bản", INTERMEDIATE: "Trung bình", ADVANCED: "Nâng cao" };
 const LEVEL_COLORS: Record<string, string> = { BEGINNER: "bg-green-500/20 text-green-400", INTERMEDIATE: "bg-yellow-500/20 text-yellow-400", ADVANCED: "bg-red-500/20 text-red-400" };
 
 export default function ResourcesPage() {
@@ -118,7 +119,7 @@ export default function ResourcesPage() {
                       <div className="mt-auto flex items-center gap-2 pt-3">
                         <Badge variant="secondary" className="text-xs">{TYPE_LABELS[res.type] || res.type}</Badge>
                         <Badge variant="secondary" className="text-xs">{res.field}</Badge>
-                        <Badge className={`text-xs ${LEVEL_COLORS[res.level] || ""}`}>{res.level}</Badge>
+                        <Badge className={`text-xs ${LEVEL_COLORS[res.level] || ""}`}>{LEVEL_LABELS[res.level] || res.level}</Badge>
                       </div>
                     </CardContent>
                   </Card>

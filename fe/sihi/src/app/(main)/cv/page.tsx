@@ -12,6 +12,7 @@ import {
   FileText, Loader2, AlertCircle, Star,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface CvItem {
   id: string;
@@ -38,6 +39,7 @@ export default function CVManagementPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const { confirm, ConfirmDialogUI } = useConfirmDialog();
 
   // ─── Load ────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -142,7 +144,12 @@ export default function CVManagementPage() {
 
   // ─── Delete ───────────────────────────────────────────────────────────────
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Xoá CV "${name}"?`)) return;
+    const ok = await confirm(`Bạn muốn xóa CV “${name}”?`, {
+      title: "Xóa CV",
+      confirmLabel: "Xóa",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/cv/${id}`, { method: "DELETE" });
       if (res.ok) {
@@ -158,6 +165,7 @@ export default function CVManagementPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="space-y-5 max-w-3xl">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -343,5 +351,7 @@ export default function CVManagementPage() {
         )}
       </motion.div>
     </div>
+    <ConfirmDialogUI />
+    </>
   );
 }

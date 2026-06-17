@@ -233,15 +233,21 @@ export default function AnalyticsPage() {
   const [history, setHistory] = useState<ProgressSnapshot[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [abandonedCount, setAbandonedCount] = useState(0);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/analytics/progress").then((r) => r.json()),
       fetch("/api/analytics/skills").then((r) => r.json()),
-    ]).then(([progData, skillData]) => {
+      fetch("/api/interviews?limit=100").then((r) => r.json()),
+    ]).then(([progData, skillData, ivData]) => {
       setProgress(progData.latest || null);
       setHistory(progData.history || []);
       setSkills(Array.isArray(skillData) ? skillData : []);
+      const abandoned = (ivData.interviews || []).filter(
+        (iv: { status: string }) => iv.status === "ABANDONED"
+      ).length;
+      setAbandonedCount(abandoned);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -272,6 +278,18 @@ export default function AnalyticsPage() {
         <h1 className="text-3xl font-bold">Phân tích kỹ năng</h1>
         <p className="mt-2 text-xl text-zinc-400">Theo dõi tiến trình và cải thiện</p>
       </motion.div>
+
+      {/* Abandoned note */}
+      {abandonedCount > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}>
+          <div className="flex items-center gap-2 rounded-xl border border-zinc-700/50 bg-zinc-800/40 px-4 py-2.5 text-sm text-zinc-400">
+            <span className="text-base">⚪</span>
+            <span>
+              <strong className="text-zinc-300">{abandonedCount} buổi bỏ dở</strong> không được tính vào biểu đồ phân tích (không có điểm số).
+            </span>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Readiness Level ── */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>

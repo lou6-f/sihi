@@ -2,15 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Monitor, Server, Database, Layers, BrainCircuit,
-  Loader2, FileText, CheckCircle, Upload, X,
+  Loader2, FileText, CheckCircle, Upload, X, AlertTriangle, Play, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const FIELD_LABELS: Record<string, string> = {
+  FRONTEND: "Frontend", BACKEND: "Backend", DATA: "Data", FULLSTACK: "Fullstack",
+};
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +62,11 @@ export default function InterviewSetupPage() {
   const [cvLoading, setCvLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Active interview state (for 409 dialog) ────────────────────────────────
+  interface ActiveInterview { id: string; field: string; level: string; createdAt: string; }
+  const [activeInterview, setActiveInterview] = useState<ActiveInterview | null>(null);
+  const [abandoning, setAbandoning] = useState(false);
 
   // Load CVs on mount
   useEffect(() => {
@@ -119,8 +128,7 @@ export default function InterviewSetupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          field,
-          level,
+          field, level,
           jdMode: resolveMode(),
           jobDescription: jd.trim() || undefined,
           cvId: cvId || undefined,
@@ -129,6 +137,10 @@ export default function InterviewSetupPage() {
       const data = await res.json();
       if (res.ok) {
         router.push(`/interview/${data.id}/session`);
+      } else if (res.status === 409 && data.existingInterview) {
+        // Tầng 1: show resume/abandon dialog
+        setActiveInterview(data.existingInterview);
+        setStarting(false);
       } else {
         toast.error(data.error || "Không thể tạo phỏng vấn");
         setStarting(false);
@@ -139,10 +151,32 @@ export default function InterviewSetupPage() {
     }
   };
 
+  // ── Resume existing interview ─────────────────────────────────────────────
+  const handleResume = () => {
+    if (!activeInterview) return;
+    router.push(`/interview/${activeInterview.id}/session`);
+  };
+
+  // ── Abandon existing + start new ─────────────────────────────────────────
+  const handleAbandonAndStart = async () => {
+    if (!activeInterview) return;
+    setAbandoning(true);
+    try {
+      await fetch(`/api/interviews/${activeInterview.id}/abandon`, { method: "PATCH" });
+      setActiveInterview(null);
+      // Retry start
+      await handleStart();
+    } catch {
+      toast.error("Lỗi hủy phiên cũ");
+    }
+    setAbandoning(false);
+  };
+
   const canStart = !!field && !!level && !starting;
 
-  // ─── UI ──────────────────────────────────────────────────────────────────
+  // ─── UI ────────────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="max-w-3xl space-y-5">
 
       {/* Header */}
@@ -334,5 +368,75 @@ export default function InterviewSetupPage() {
         ) : null}
       </motion.div>
     </div>
+
+    {/* ── Tầng 1: Resume/Abandon dialog ─────────────────────────────────── */}
+    <AnimatePresence>
+      {activeInterview && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setActiveInterview(null)}
+          />
+          <motion.div
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 px-4"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          >
+            <div className="rounded-2xl border border-amber-500/30 bg-zinc-900 shadow-2xl overflow-hidden">
+              {/* Header strip */}
+              <div className="bg-amber-500/10 border-b border-amber-500/20 px-5 py-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20">
+                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-100">Bạn có phỏng vấn đang dở</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {FIELD_LABELS[activeInterview.field] ?? activeInterview.field} · {activeInterview.level}
+                    {" · "}
+                    {new Date(activeInterview.createdAt).toLocaleDateString("vi-VN", {
+                      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-3">
+                <p className="text-sm text-zinc-400">
+                  Tiếp tục buổi cũ để không mất tiến trình, hoặc hủy để bắt đầu phỏng vấn mới.
+                </p>
+                <Button
+                  onClick={handleResume}
+                  className="w-full bg-violet-600 hover:bg-violet-500 text-white gap-2"
+                >
+                  <Play className="h-4 w-4 fill-white" />
+                  Tiếp tục phỏng vấn cũ
+                </Button>
+                <Button
+                  onClick={handleAbandonAndStart}
+                  disabled={abandoning}
+                  variant="outline"
+                  className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-red-400 hover:border-red-500/50 gap-2"
+                >
+                  {abandoning
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Trash2 className="h-4 w-4" />}
+                  Hủy buổi cũ &amp; bắt đầu mới
+                </Button>
+                <button
+                  onClick={() => setActiveInterview(null)}
+                  className="w-full text-xs text-zinc-600 hover:text-zinc-400 py-1"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

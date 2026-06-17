@@ -46,6 +46,7 @@ enum InterviewStatus {
   COMPLETED
   CANCELLED
   ERROR
+  ABANDONED
 }
 
 enum ResourceType {
@@ -117,7 +118,8 @@ model User {
   accounts            Account[]
   skills              UserSkill[]
   progressSnapshots   UserProgressSnapshot[]
-  passwordResetOtps   PasswordResetOtp[]
+  passwordResetOtps      PasswordResetOtp[]
+  emailVerificationOtps  EmailVerificationOtp[]
 
   @@map("users")
 }
@@ -163,20 +165,41 @@ model PasswordResetOtp {
 }
 
 // ═══════════════════════════════════════
+// Email Verification OTP
+// ═══════════════════════════════════════
+
+model EmailVerificationOtp {
+  id        String    @id @default(cuid())
+  userId    String
+  email     String
+  otpHash   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, createdAt])
+  @@map("email_verification_otps")
+}
+
+// ═══════════════════════════════════════
 // CV
 // ═══════════════════════════════════════
 
 model CV {
-  id          String   @id @default(cuid())
-  userId      String
-  fileName    String
-  displayName String?
-  filePath    String
-  fileSize    Int
-  mimeType    String   @default("application/pdf")
-  orderIndex  Int      @default(0)
-  analysis    Json?
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  userId            String
+  fileName          String
+  displayName       String?
+  filePath          String
+  fileSize          Int
+  mimeType          String   @default("application/pdf")
+  orderIndex        Int      @default(0)
+  analysis          Json?
+  cvModuleSessionId String?  // session_id từ cv-module để dùng cho evaluation KG
+  createdAt         DateTime @default(now())
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   interviews Interview[]
@@ -203,6 +226,7 @@ model Interview {
   difficultyProgression Json?
   startedAt             DateTime?
   endedAt               DateTime?
+  lastActivityAt        DateTime?
   createdAt             DateTime        @default(now())
   // JD-Based Interview
   targetRole            String?
@@ -374,20 +398,22 @@ model InterviewRubric {
 // ═══════════════════════════════════════
 
 model Resource {
-  id            String         @id @default(cuid())
-  title         String
-  description   String?
-  type          ResourceType
-  url           String
-  field         InterviewField
-  level         ResourceLevel  @default(BEGINNER)
-  summary       String?
-  status        ResourceStatus @default(DRAFT)
-  createdBy     String?
-  isAiGenerated Boolean        @default(false)
-  sourceId      String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  title          String
+  description    String?
+  type           ResourceType
+  url            String
+  field          InterviewField
+  level          ResourceLevel  @default(BEGINNER)
+  summary        String?
+  status         ResourceStatus @default(DRAFT)
+  createdBy      String?
+  isAiGenerated  Boolean        @default(false)
+  sourceId       String?
+  externalId     String?        @unique // "devto_12345" | "hn_12345" — dùng để dedup
+  relevanceScore Int?           // 0-100 từ Gemini analyzer
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   tags        ResourceTag[]
   chunks      ResourceChunk[]
