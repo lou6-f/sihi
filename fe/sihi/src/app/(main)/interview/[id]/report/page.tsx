@@ -59,6 +59,7 @@ export default function ReportPage() {
   const id = params.id as string;
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false); // true chỉ khi đang tạo báo cáo mới
   const [loadingStep, setLoadingStep] = useState(0);
   const [expandedStar, setExpandedStar] = useState<number | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -104,6 +105,7 @@ export default function ReportPage() {
       if (done) return; // Báo cáo đã có → hiển thị ngay, không cần animation
 
       // Chưa có → bật loading animation + polling
+      setIsGenerating(true);
       stepTimers = [
         setTimeout(() => setLoadingStep(1), 2000),
         setTimeout(() => setLoadingStep(2), 6000),
@@ -121,8 +123,15 @@ export default function ReportPage() {
     };
   }, [id]);
 
-  // Loading screen
-  if (loading) return (
+  // Chỉ load data ban đầu → spinner đơn giản
+  if (loading && !isGenerating) return (
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
+    </div>
+  );
+
+  // Đang tạo báo cáo mới → full animation
+  if (loading && isGenerating) return (
     <div className="flex items-center justify-center min-h-[70vh]">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
