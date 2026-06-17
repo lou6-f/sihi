@@ -82,7 +82,7 @@ export default function ReportPage() {
       } catch {}
     };
 
-    const fetchReport = async () => {
+    const fetchReport = async (): Promise<boolean> => {
       try {
         const r = await fetch(`/api/interviews/${id}/report`);
         const data = await r.json();
@@ -93,24 +93,28 @@ export default function ReportPage() {
           setLoading(false);
           return true;
         }
-        // Chưa có report → trigger generation nếu chưa làm
+        // Chưa có report → trigger generation
         if (r.status === 404) await triggerGeneration();
       } catch {}
       return false;
     };
-    stepTimers = [
-      setTimeout(() => setLoadingStep(1), 2000),
-      setTimeout(() => setLoadingStep(2), 6000),
-      setTimeout(() => setLoadingStep(3), 12000),
-    ];
+
+    // Thử lấy báo cáo ngay lập tức (không delay)
     fetchReport().then((done) => {
-      if (!done) {
-        pollRef.current = setInterval(async () => {
-          const done = await fetchReport();
-          if (done && pollRef.current) clearInterval(pollRef.current);
-        }, 4000);
-      }
+      if (done) return; // Báo cáo đã có → hiển thị ngay, không cần animation
+
+      // Chưa có → bật loading animation + polling
+      stepTimers = [
+        setTimeout(() => setLoadingStep(1), 2000),
+        setTimeout(() => setLoadingStep(2), 6000),
+        setTimeout(() => setLoadingStep(3), 12000),
+      ];
+      pollRef.current = setInterval(async () => {
+        const done = await fetchReport();
+        if (done && pollRef.current) clearInterval(pollRef.current);
+      }, 4000);
     });
+
     return () => {
       stepTimers.forEach(clearTimeout);
       if (pollRef.current) clearInterval(pollRef.current);
