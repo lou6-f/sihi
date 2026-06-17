@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Mail, CheckCircle, RefreshCw, ArrowLeft } from "lucide-react";
+import { motion } from "motion/react";
+import { Mail, CheckCircle, RefreshCw, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function VerifyEmailPage() {
+// ── Nội dung trang (dùng useSearchParams → cần bọc trong Suspense) ─────────
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
@@ -29,12 +30,11 @@ export default function VerifyEmailPage() {
   }, [cooldown]);
 
   const handleInput = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return; // chỉ nhận số
+    if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1); // lấy ký tự cuối nếu paste
+    newOtp[index] = value.slice(-1);
     setOtp(newOtp);
     setError("");
-    // Auto-focus next
     if (value && index < 5) inputRefs.current[index + 1]?.focus();
   };
 
@@ -119,75 +119,86 @@ export default function VerifyEmailPage() {
       animate={{ opacity: 1, y: 0 }}
       className="w-full"
     >
-        {/* Card */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-xl p-8 space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <div className="w-14 h-14 rounded-2xl bg-violet-500/20 flex items-center justify-center mx-auto">
-              <Mail className="w-7 h-7 text-violet-400" />
-            </div>
-            <h1 className="text-2xl font-bold text-zinc-100">Xác thực email</h1>
-            <p className="text-sm text-zinc-400">
-              Nhập mã 6 chữ số đã gửi đến
-            </p>
-            <p className="text-sm font-semibold text-violet-300">{email}</p>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-xl p-8 space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="w-14 h-14 rounded-2xl bg-violet-500/20 flex items-center justify-center mx-auto">
+            <Mail className="w-7 h-7 text-violet-400" />
           </div>
-
-          {/* OTP inputs */}
-          <div className="flex gap-2 justify-center" onPaste={handlePaste}>
-            {otp.map((digit, i) => (
-              <input
-                key={i}
-                ref={(el) => { inputRefs.current[i] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleInput(i, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(i, e)}
-                className={`w-12 h-14 text-center text-xl font-bold rounded-xl border bg-zinc-800 text-zinc-100 outline-none transition-all
-                  ${error ? "border-red-500" : digit ? "border-violet-500" : "border-zinc-700"}
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30`}
-              />
-            ))}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <p className="text-sm text-red-400 text-center">{error}</p>
-          )}
-
-          {/* Verify button */}
-          <Button
-            onClick={handleVerify}
-            disabled={loading || otp.join("").length !== 6}
-            className="w-full h-11 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 font-semibold text-white"
-          >
-            {loading ? "Đang xác thực..." : "Xác thực"}
-          </Button>
-
-          {/* Resend */}
-          <div className="text-center">
-            <p className="text-sm text-zinc-500 mb-2">Không nhận được mã?</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleResend}
-              disabled={resending || cooldown > 0}
-              className="text-violet-400 hover:text-violet-300 gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${resending ? "animate-spin" : ""}`} />
-              {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi lại mã"}
-            </Button>
-          </div>
-
-          {/* Back */}
-          <div className="text-center pt-2 border-t border-zinc-800">
-            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
-              <ArrowLeft className="w-3 h-3" /> Quay lại đăng nhập
-            </Link>
-          </div>
+          <h1 className="text-2xl font-bold text-zinc-100">Xác thực email</h1>
+          <p className="text-sm text-zinc-400">Nhập mã 6 chữ số đã gửi đến</p>
+          <p className="text-sm font-semibold text-violet-300">{email}</p>
         </div>
+
+        {/* OTP inputs */}
+        <div className="flex gap-2 justify-center" onPaste={handlePaste}>
+          {otp.map((digit, i) => (
+            <input
+              key={i}
+              ref={(el) => { inputRefs.current[i] = el; }}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={(e) => handleInput(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              className={`w-12 h-14 text-center text-xl font-bold rounded-xl border bg-zinc-800 text-zinc-100 outline-none transition-all
+                ${error ? "border-red-500" : digit ? "border-violet-500" : "border-zinc-700"}
+                focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30`}
+            />
+          ))}
+        </div>
+
+        {/* Error */}
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+
+        {/* Verify button */}
+        <Button
+          onClick={handleVerify}
+          disabled={loading || otp.join("").length !== 6}
+          className="w-full h-11 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 font-semibold text-white"
+        >
+          {loading
+            ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Đang xác thực...</>
+            : "Xác thực"
+          }
+        </Button>
+
+        {/* Resend */}
+        <div className="text-center">
+          <p className="text-sm text-zinc-500 mb-2">Không nhận được mã?</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleResend}
+            disabled={resending || cooldown > 0}
+            className="text-violet-400 hover:text-violet-300 gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${resending ? "animate-spin" : ""}`} />
+            {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : "Gửi lại mã"}
+          </Button>
+        </div>
+
+        {/* Back */}
+        <div className="text-center pt-2 border-t border-zinc-800">
+          <Link href="/login" className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+            <ArrowLeft className="w-3 h-3" /> Quay lại đăng nhập
+          </Link>
+        </div>
+      </div>
     </motion.div>
+  );
+}
+
+// ── Page export với Suspense boundary ─────────────────────────────────────────
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12 text-zinc-400 gap-2">
+        <Loader2 className="w-5 h-5 animate-spin" /> Đang tải...
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
