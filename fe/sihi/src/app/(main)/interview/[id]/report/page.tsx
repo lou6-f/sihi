@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import useSWR from "swr";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,17 +55,33 @@ const priorityStyle: Record<string, string> = {
 // Page
 // ═══════════════════════════════════════
 
+// Fetcher: trả về null cho 404 (chưa có report), throw cho lỗi thực sự
+const reportFetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("Lỗi tải báo cáo");
+  const data = await r.json();
+  return data?.error ? null : data;
+};
+
 export default function ReportPage() {
   const params = useParams();
   const id = params.id as string;
-  const [report, setReport] = useState<Record<string, unknown> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false); // true chỉ khi đang tạo báo cáo mới
+
+  // SWR: lần đầu fetch từ API, lần sau lấy từ cache → render ngay lập tức
+  // loading.tsx hiển thị trong khi SWR đang fetch lần đầu (Suspense)
+  const { data: report, mutate } = useSWR(
+    id ? `/api/interviews/${id}/report` : null,
+    reportFetcher,
+    { suspense: true, revalidateOnFocus: false }
+  );
+
+  const [isGenerating, setIsGenerating] = useState(!report);
   const [loadingStep, setLoadingStep] = useState(0);
   const [expandedStar, setExpandedStar] = useState<number | null>(null);
-  // resourceMatches[i] = danh sách tài liệu DB khớp với roadmap item thứ i
   const [resourceMatches, setResourceMatches] = useState<Record<number, { title: string; url: string }[]>>({});
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const generationTriggered = useRef(false);
 
   const REPORT_STEPS = [
     { label: "Được rồi, đang xử lý...",      detail: "Tổng hợp dữ liệu phỏng vấn" },
@@ -94,67 +111,38 @@ export default function ReportPage() {
   }, [report]);
 
 
+  // Khi không có report → trigger generation + poll bằng SWR mutate
   useEffect(() => {
-    let stepTimers: NodeJS.Timeout[] = [];
-    let generationTriggered = false;
+    if (report) {
+      // Report đã có → dừng mọi animation và polling
+      setIsGenerating(false);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      return;
+    }
 
-    const triggerGeneration = async () => {
-      if (generationTriggered) return;
-      generationTriggered = true;
-      try {
-        await fetch(`/api/interviews/${id}/report`, { method: "POST" });
-      } catch {}
-    };
+    // Chưa có report → trigger generation một lần
+    if (!generationTriggered.current) {
+      generationTriggered.current = true;
+      fetch(`/api/interviews/${id}/report`, { method: "POST" }).catch(() => {});
+    }
 
-    const fetchReport = async (): Promise<boolean> => {
-      try {
-        const r = await fetch(`/api/interviews/${id}/report`);
-        const data = await r.json();
-        if (r.ok && data && !data.error) {
-          stepTimers.forEach(clearTimeout);
-          if (pollRef.current) clearInterval(pollRef.current);
-          setReport(data);
-          setLoading(false);
-          return true;
-        }
-        // Chưa có report → trigger generation
-        if (r.status === 404) await triggerGeneration();
-      } catch {}
-      return false;
-    };
-
-    // Thử lấy báo cáo ngay lập tức (không delay)
-    fetchReport().then((done) => {
-      if (done) return; // Báo cáo đã có → hiển thị ngay, không cần animation
-
-      // Chưa có → bật loading animation + polling
-      setIsGenerating(true);
-      stepTimers = [
-        setTimeout(() => setLoadingStep(1), 2000),
-        setTimeout(() => setLoadingStep(2), 6000),
-        setTimeout(() => setLoadingStep(3), 12000),
-      ];
-      pollRef.current = setInterval(async () => {
-        const done = await fetchReport();
-        if (done && pollRef.current) clearInterval(pollRef.current);
-      }, 4000);
-    });
+    setIsGenerating(true);
+    const stepTimers = [
+      setTimeout(() => setLoadingStep(1), 2000),
+      setTimeout(() => setLoadingStep(2), 6000),
+      setTimeout(() => setLoadingStep(3), 12000),
+    ];
+    // Poll mỗi 4s bằng SWR mutate → tự động cập nhật cache
+    pollRef.current = setInterval(() => mutate(), 4000);
 
     return () => {
       stepTimers.forEach(clearTimeout);
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [id]);
+  }, [report, id, mutate]);
 
-  // Chỉ load data ban đầu → spinner đơn giản
-  if (loading && !isGenerating) return (
-    <div className="flex items-center justify-center min-h-[70vh]">
-      <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
-    </div>
-  );
-
-  // Đang tạo báo cáo mới → full animation
-  if (loading && isGenerating) return (
+  // Đang tạo báo cáo mới → full animation (chỉ khi chưa có report)
+  if (isGenerating && !report) return (
     <div className="flex items-center justify-center min-h-[70vh]">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
