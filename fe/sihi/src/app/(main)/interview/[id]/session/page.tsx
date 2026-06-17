@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,7 @@ export default function InterviewSessionPage() {
   const interviewActiveRef = useRef(false);
   const isCompletedRef = useRef(false);
   const { setIsInInterview } = useInterviewGuard();
-  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * IT_TIPS.length));
+  const [tipIndex, setTipIndex] = useState(0); // 0 cho SSR, randomize phía client trong useEffect
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -117,6 +118,11 @@ export default function InterviewSessionPage() {
     { label: "Đang tạo kế hoạch câu hỏi...",detail: "AI đang xây dựng lộ trình phỏng vấn" },
     { label: "Chuẩn bị câu hỏi đầu tiên...",detail: "Sắp sẵn sàng!" },
   ], []);
+
+  // Randomize tip khi mount (client-only, tránh SSR/CSR mismatch)
+  useEffect(() => {
+    setTipIndex(Math.floor(Math.random() * IT_TIPS.length));
+  }, []);
 
   // Auto-advance loading steps + rotate IT tips
   useEffect(() => {
