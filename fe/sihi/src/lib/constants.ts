@@ -39,7 +39,7 @@ export const INTERVIEW_FIELDS = [
 // ─── Interview Levels ───────────────────────────────────────────────────────
 
 export const INTERVIEW_LEVELS = [
-  { value: "INTERN", label: "Thực tập sinh" },
+  { value: "INTERN", label: "Intern" },
   { value: "FRESHER", label: "Fresher" },
   { value: "JUNIOR", label: "Junior" },
   { value: "MIDDLE", label: "Middle" },

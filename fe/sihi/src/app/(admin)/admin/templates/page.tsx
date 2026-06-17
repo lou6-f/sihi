@@ -49,7 +49,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 const LEVEL_LABELS: Record<string, string> = {
-  INTERN:   "Thực tập sinh",
+  INTERN:   "Intern",
   FRESHER:  "Fresher",
   JUNIOR:   "Junior",
 };

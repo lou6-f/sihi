@@ -69,11 +69,10 @@ export default function ReportPage() {
   const id = params.id as string;
 
   // SWR: lần đầu fetch từ API, lần sau lấy từ cache → render ngay lập tức
-  // loading.tsx hiển thị trong khi SWR đang fetch lần đầu (Suspense)
-  const { data: report, mutate } = useSWR(
+  const { data: report, mutate, isLoading } = useSWR(
     id ? `/api/interviews/${id}/report` : null,
     reportFetcher,
-    { suspense: true, revalidateOnFocus: false }
+    { revalidateOnFocus: false }
   );
 
   const [isGenerating, setIsGenerating] = useState(!report);
@@ -140,6 +139,14 @@ export default function ReportPage() {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
   }, [report, id, mutate]);
+
+  // Đang fetch lần đầu (chưa có cache) → spinner nhỏ
+  // Lần sau (có cache SWR) → isLoading = false, render ngay không cần spinner
+  if (isLoading) return (
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
+    </div>
+  );
 
   // Đang tạo báo cáo mới → full animation (chỉ khi chưa có report)
   if (isGenerating && !report) return (
