@@ -557,7 +557,7 @@ export default function InterviewSessionPage() {
           <Badge variant="secondary">{interview?.level}</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">Câu {questionNum}/{interview?.maxQuestions}</Badge>
+
 
           {/* Voice selector — hiện cả browser lẫn FPT AI */}
           {ttsSupported && ttsEnabled && (
