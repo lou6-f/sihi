@@ -448,15 +448,15 @@ export default function InterviewSetupPage() {
               <ul className="space-y-1.5 text-xs text-zinc-500">
                 <li className="flex items-start gap-1.5">
                   <span className="mt-0.5 shrink-0">•</span>
-                  Thêm CV để AI cá nhân hóa câu hỏi theo kinh nghiệm của bạn
+                  Tải lên CV để AI cá nhân hóa câu hỏi theo đúng kinh nghiệm của bạn.
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="mt-0.5 shrink-0">•</span>
-                  Dán JD để luyện đúng với vị trí tuyển dụng thực tế
+                  Thêm thông tin JD giúp bám sát yêu cầu từ vị trí tuyển dụng thực tế.
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="mt-0.5 shrink-0">•</span>
-                  Mỗi phiên gồm 5–10 câu, kết thúc có báo cáo đánh giá chi tiết
+                  Kết thúc phỏng vấn sẽ nhận được báo cáo đánh giá chi tiết.
                 </li>
               </ul>
             </div>
