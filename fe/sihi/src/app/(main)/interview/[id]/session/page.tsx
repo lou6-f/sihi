@@ -208,6 +208,7 @@ export default function InterviewSessionPage() {
 
   // ─── Auto-speak new AI messages ────────────────────────────────────────────
   useEffect(() => {
+    if (isReadonly) return; // Không đọc khi xem lại
     if (!ttsEnabled || !ttsSupported) return;
     const aiMessages = messages.filter((m) => m.role === "AI");
     if (aiMessages.length === 0) return;
@@ -216,7 +217,7 @@ export default function InterviewSessionPage() {
       lastSpokenIdRef.current = latest.id;
       speak(latest.content);
     }
-  }, [messages, ttsEnabled, ttsSupported, speak]);
+  }, [messages, ttsEnabled, ttsSupported, speak, isReadonly]);
 
   // ─── Load interview ────────────────────────────────────────────────────────
   const startInterview = useCallback(async () => {
