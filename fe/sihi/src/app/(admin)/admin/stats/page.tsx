@@ -336,14 +336,14 @@ export default function AdminStatsPage() {
 
                 const rows = [
                   {
-                    label: "Hoàn thành PV",
+                    label: "Hoàn thành phỏng vấn",
                     value: stats.completedInterviews,
                     pct: completionRate,
                     gradient: "from-cyan-500 to-cyan-400",
                     badgeBg: "bg-cyan-500/20 text-cyan-300",
                   },
                   {
-                    label: "Người dùng HĐ",
+                    label: "Người dùng hoạt động",
                     value: stats.activeUsers,
                     pct: activeRate,
                     gradient:
@@ -365,7 +365,7 @@ export default function AdminStatsPage() {
                     transition={{ delay: idx * 0.1 + 0.75 }}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-32 flex-shrink-0">
+                      <div className="w-44 flex-shrink-0">
                         <Badge className={`${row.badgeBg} text-xs`}>
                           {row.label}
                         </Badge>
