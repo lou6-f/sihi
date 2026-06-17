@@ -24,7 +24,7 @@ function validateEmail(v: string) {
   if (!v) return "Vui lòng nhập email";
   // Yêu cầu: có @, domain hợp lệ, đuôi (TLD) ít nhất 2 ký tự
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v))
-    return "Email không hợp lệ — ví dụ: you@gmail.com";
+    return "Email không hợp lệ (ví dụ: you@gmail.com)";
   return "";
 }
 
