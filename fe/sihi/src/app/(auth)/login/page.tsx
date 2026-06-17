@@ -8,14 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const [notVerified, setNotVerified] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,6 +66,7 @@ export default function LoginPage() {
               </div>
             )}
 
+            {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -79,6 +80,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Mật khẩu */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Mật khẩu</Label>
@@ -89,11 +91,22 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
-                  id="password" type="password" placeholder="Mật khẩu của bạn"
-                  autoComplete="new-password"
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mật khẩu của bạn"
+                  autoComplete="current-password"
                   value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10" required
+                  className="pl-10 pr-10" required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 

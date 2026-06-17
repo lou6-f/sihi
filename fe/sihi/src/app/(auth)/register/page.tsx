@@ -8,10 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, User, Mail, Lock, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, User, Mail, Lock, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-// ─── Validation rules ───────────────────────────────────────
+// ─── Validation rules ─────────────────────────────────────────
 
 function validateName(v: string) {
   if (!v) return "Vui lòng nhập họ và tên";
@@ -52,6 +52,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [touched, setTouched] = useState({ name: false, email: false, password: false, confirmPassword: false });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
@@ -61,7 +63,6 @@ export default function RegisterPage() {
   const touch = (key: keyof typeof touched) => () =>
     setTouched((t) => ({ ...t, [key]: true }));
 
-  // Per-field errors (only shown after touched)
   const errors = {
     name: touched.name ? validateName(form.name) : "",
     email: touched.email ? validateEmail(form.email) : "",
@@ -78,7 +79,6 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError("");
-    // Touch all fields to show all errors
     setTouched({ name: true, email: true, password: true, confirmPassword: true });
     if (!isValid) return;
 
@@ -93,6 +93,12 @@ export default function RegisterPage() {
     setLoading(false);
 
     if (!res.ok) {
+      // Email tồn tại nhưng chưa verify → redirect sang trang xác thực
+      if (res.status === 409 && data.needsVerification) {
+        toast.info("Email này đã đăng ký. Đang chuyển đến trang xác thực...");
+        router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
+        return;
+      }
       setServerError(data.error || "Đăng ký thất bại, vui lòng thử lại");
       return;
     }
@@ -161,14 +167,23 @@ export default function RegisterPage() {
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   placeholder="Ví dụ: Long@2024"
                   value={form.password}
                   onChange={set("password")}
                   onBlur={touch("password")}
-                  className={`pl-10 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  className={`pl-10 pr-10 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
               {/* Password strength checklist */}
               {(touched.password || form.password) && (
@@ -195,14 +210,23 @@ export default function RegisterPage() {
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <Input
                   id="confirmPassword"
-                  type="password"
+                  type={showConfirm ? "text" : "password"}
                   autoComplete="new-password"
                   placeholder="Nhập lại mật khẩu"
                   value={form.confirmPassword}
                   onChange={set("confirmPassword")}
                   onBlur={touch("confirmPassword")}
-                  className={`pl-10 ${errors.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  className={`pl-10 pr-10 ${errors.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
               {errors.confirmPassword && <p className="text-xs text-red-400">⚠ {errors.confirmPassword}</p>}
             </div>
