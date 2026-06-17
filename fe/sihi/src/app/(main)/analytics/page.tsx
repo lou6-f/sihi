@@ -42,7 +42,7 @@ const READINESS_LABELS: Record<string, string> = {
 
 // Tất cả 8 chiều đánh giá chuẩn (dim_ prefix)
 const SKILL_LABELS: Record<string, string> = {
-  // 4 chiều phỏng vấn cốt lõi (dimensionScores)
+  // 4 chiều phỏng vấn cốt lõi (dimensionScores) — tên hiện tại
   dim_technicalKnowledge:  "Kiến thức kỹ thuật",
   dim_problemSolving:      "Tư duy giải quyết vấn đề",
   dim_practicalExperience: "Kinh nghiệm thực tế",
@@ -52,6 +52,9 @@ const SKILL_LABELS: Record<string, string> = {
   dim_confidence:          "Tự tin",
   dim_teamwork:            "Làm việc nhóm",
   dim_initiative:          "Tinh thần chủ động",
+  // Alias tên cũ (evaluator prompt phiên bản trước)
+  dim_reasoningAbility:    "Tư duy & suy luận",
+  dim_projectExperience:   "Kinh nghiệm dự án",
 };
 
 function formatSkillName(raw: string): string {
