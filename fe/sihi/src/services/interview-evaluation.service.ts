@@ -30,6 +30,60 @@ export interface InternalEvaluation {
 }
 
 // ═══════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════
+
+/**
+ * Trích xuất JSON từ response của AI — tương đương _extract_json() trong Python.
+ * Xử lý cả trường hợp AI bọc JSON trong markdown code block (```json ... ```).
+ */
+function extractJSON(text: string): unknown {
+  let s = text.trim();
+  // Bóc markdown code block nếu có
+  if (s.startsWith("```")) {
+    s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  }
+  // Tìm object JSON đầu tiên và cuối cùng (bỏ text thừa trước/sau)
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start !== -1 && end !== -1) {
+    return JSON.parse(s.slice(start, end + 1));
+  }
+  return JSON.parse(s);
+}
+
+/** Các chuỗi placeholder đại diện cho câu trả lời im lặng */
+const SILENT_PLACEHOLDERS = new Set([
+  "(không trả lời)",
+  "(im lặng)",
+  "(silence)",
+  "(no answer)",
+  "(không có câu trả lời)",
+  "...",
+]);
+
+function isSilentAnswer(answer: string): boolean {
+  const trimmed = answer.trim().toLowerCase();
+  return trimmed === "" || SILENT_PLACEHOLDERS.has(trimmed);
+}
+
+/** RichEvaluation trả về khi ứng viên hoàn toàn không trả lời */
+const SILENT_EVALUATION: RichEvaluation = {
+  score: 0,
+  accuracy: 0,
+  depth: 0,
+  confidence: 0,
+  communication: 0,
+  understanding: 0,
+  isUnknown: true,
+  mentionedProjects: [],
+  suggestedAction: "GIVE_HINT",
+  keyPointsCovered: [],
+  keyPointsMissed: [],
+  feedback: "Ứng viên không trả lời câu hỏi này.",
+};
+
+// ═══════════════════════════════════════
 // Service
 // ═══════════════════════════════════════
 
@@ -44,6 +98,11 @@ export class InterviewEvaluationService {
    * Returns rich multi-dimensional evaluation with adaptive signals.
    */
   async evaluateAnswer(input: AnswerEvaluationInput): Promise<RichEvaluation> {
+    // ── Bắt im lặng trước, không gọi AI ──
+    if (isSilentAnswer(input.answer)) {
+      return SILENT_EVALUATION;
+    }
+
     const messages = buildAnswerEvaluationPrompt({
       question: input.question,
       answer: input.answer,
@@ -61,11 +120,10 @@ export class InterviewEvaluationService {
     });
 
     try {
-      const raw = JSON.parse(response.content);
+      const raw = extractJSON(response.content) as Record<string, unknown>;
 
       // Clamp all scores 0-10
       const clamp = (v: unknown) => Math.min(10, Math.max(0, Number(v) || 0));
-      const clamp100 = (v: unknown) => Math.min(100, Math.max(0, Number(v) || 0));
 
       const evaluation: RichEvaluation = {
         score: clamp(raw.score),
@@ -80,19 +138,20 @@ export class InterviewEvaluationService {
         keyPointsCovered: Array.isArray(raw.keyPointsCovered) ? raw.keyPointsCovered : [],
         keyPointsMissed: Array.isArray(raw.keyPointsMissed) ? raw.keyPointsMissed : [],
         feedback: String(raw.feedback || ""),
-        starEval: raw.starEval ?? undefined,
+        starEval: raw.starEval as RichEvaluation["starEval"] ?? undefined,
       };
 
       return evaluation;
     } catch {
-      // Fallback if AI response is malformed
+      // Fallback khi AI trả về response không parse được — dùng 0 thay vì 5
+      // để tránh làm lệch điểm tổng kết
       return {
-        score: 5,
-        accuracy: 5,
-        depth: 5,
-        confidence: 5,
-        communication: 5,
-        understanding: 5,
+        score: 0,
+        accuracy: 0,
+        depth: 0,
+        confidence: 0,
+        communication: 0,
+        understanding: 0,
         isUnknown: false,
         mentionedProjects: [],
         suggestedAction: "ASK_NEW_QUESTION",
@@ -103,3 +162,4 @@ export class InterviewEvaluationService {
     }
   }
 }
+

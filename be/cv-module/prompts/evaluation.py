@@ -36,8 +36,9 @@ Bạn sẽ nhận được một đối tượng JSON có cấu trúc như sau:
 
 ### Quy tắc bổ sung (BẮT BUỘC):
 - **Ngôn ngữ:** Câu hỏi ("model"), câu trả lời ("user") và toàn bộ nhận xét phải dùng `target_language`, được xác định từ job description. Nếu phát hiện lệch ngôn ngữ trong transcript, đánh giá 0 điểm cho toàn bộ câu hỏi đó do lỗi giao tiếp cơ bản và ghi rõ lý do language mismatch trong phần "comment".
-- **Độ dài:** Nếu câu trả lời ngắn hơn 2 câu -> Mỗi thành phần STAR tối đa đạt 5 điểm.
-- **Kết quả:** Nếu không có kết quả (Result) rõ ràng -> Thành phần Result tối đa đạt 3 điểm.
+- **Câu trả lời rỗng/im lặng:** Nếu câu trả lời HOÀN TOÀN RỖNG ("", "...", "(không trả lời)", "(im lặng)", "(silence)") → tất cả thành phần STAR = 0, question_score = 0.0, comment = "Ứng viên không cung cấp câu trả lời cho câu hỏi này." KHÔNG được gán bất kỳ điểm nào khác 0.
+- **Độ dài:** Nếu câu trả lời ngắn hơn 2 câu (nhưng KHÔNG rỗng) → Mỗi thành phần STAR tối đa đạt 3 điểm (không phải 5).
+- **Kết quả:** Nếu không có kết quả (Result) rõ ràng → Thành phần Result tối đa đạt 3 điểm.
 - **Tính khách quan:** Không suy đoán thông tin không có trong văn bản. Chỉ dựa trên nội dung "text" được cung cấp.
 - **Ngôn ngữ phản hồi:** Toàn bộ nội dung nhận xét (comment, strengths, improvements, overall_comment) phải được viết bằng `target_language`, văn phong chuyên nghiệp.
 
