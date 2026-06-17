@@ -85,6 +85,7 @@ export default function InterviewSessionPage() {
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [showExitModal, setShowExitModal] = useState(false);
   const [showInactivityDialog, setShowInactivityDialog] = useState(false);
+  const [finishing, setFinishing] = useState(false); // loading khi kết thúc sớm
   const interviewActiveRef = useRef(false);
   const isCompletedRef = useRef(false);
   const { setIsInInterview } = useInterviewGuard();
@@ -394,8 +395,13 @@ export default function InterviewSessionPage() {
     setIsInInterview(false);
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     setShowInactivityDialog(false);
+    setShowExitModal(false);
     stopSpeaking();
     if (isListening) stopListening();
+
+    // Hiện loading overlay ngay lập tức
+    setFinishing(true);
+
     try {
       await fetch(`/api/interviews/${id}/end`, { method: "POST" });
       await fetch(`/api/interviews/${id}/report`, { method: "POST" }).catch(() => {});
@@ -408,7 +414,6 @@ export default function InterviewSessionPage() {
   // Tầng 2 handlers — InactivityDialog
   const handleEndEarly = async () => {
     setShowInactivityDialog(false);
-    toast.loading("Đang tạo báo cáo...");
     await doEnd();
   };
   const handleContinueFromDialog = () => {
@@ -419,6 +424,37 @@ export default function InterviewSessionPage() {
   const handleEnd = () => setShowExitModal(true);
 
   // ─── Loading / Error States ───────────────────────────────────────────────
+  // ─── Finishing overlay (kết thúc sớm) ──────────────────────────────────────
+  if (finishing) return (
+    <div className="flex items-center justify-center min-h-[70vh]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center space-y-6 max-w-sm w-full px-6"
+      >
+        <div className="relative mx-auto w-24 h-24">
+          <div className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" />
+          <div className="absolute inset-2 rounded-full bg-violet-500/10 animate-ping" style={{ animationDelay: "0.3s" }} />
+          <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-violet-600/20 border border-violet-500/30">
+            <BrainCircuit className="h-12 w-12 text-violet-400" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-lg font-semibold text-zinc-100">Đang tổng hợp đánh giá...</p>
+          <p className="text-sm text-zinc-400">AI đang phân tích buổi phỏng vấn của bạn</p>
+          <p className="text-xs text-zinc-600">Quá trình này có thể mất 15-30 giây</p>
+        </div>
+        <div className="h-1 w-full rounded-full bg-zinc-800 overflow-hidden">
+          <motion.div
+            className="h-1 rounded-full bg-violet-500"
+            animate={{ width: ["0%", "85%"] }}
+            transition={{ duration: 25, ease: "easeOut" }}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[70vh]">
       <motion.div
@@ -805,7 +841,7 @@ export default function InterviewSessionPage() {
                   </Button>
                   <Button
                     className="flex-1 bg-red-600 hover:bg-red-700"
-                    onClick={() => { setShowExitModal(false); doEnd(); }}
+                  onClick={async () => { setShowExitModal(false); await doEnd(); }}
                   >
                     Kết thúc &amp; Xem báo cáo
                   </Button>
