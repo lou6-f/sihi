@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,30 +63,25 @@ export default function InterviewSetupPage() {
   const [jd, setJd]         = useState("");
   const [starting, setStarting] = useState(false);
 
-  // CV list
-  const [cvList, setCvList]       = useState<CvItem[]>([]);
-  const [cvLoading, setCvLoading] = useState(true);
+  // CV list — SWR cầm dữ liệu, navigate về trang show ngay
+  const { data: cvData, isLoading: cvLoading, mutate: mutateCvList } = useSWR<CvItem[]>(
+    "/api/cv",
+    async (url: string) => {
+      const res = await fetch(url);
+      const data = await res.json();
+      return (Array.isArray(data) ? data : []).sort(
+        (a: CvItem, b: CvItem) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
+    }
+  );
+  const cvList: CvItem[] = cvData || [];
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Active interview state (for 409 dialog) ────────────────────────────────
+  // ── Active interview state (for 409 dialog) ──────────────────────────────
   interface ActiveInterview { id: string; field: string; level: string; createdAt: string; }
   const [activeInterview, setActiveInterview] = useState<ActiveInterview | null>(null);
   const [abandoning, setAbandoning] = useState(false);
-
-  // Load CVs on mount
-  useEffect(() => {
-    fetch("/api/cv")
-      .then((r) => r.json())
-      .then((data) => {
-        const list: CvItem[] = (Array.isArray(data) ? data : []).sort(
-          (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
-        );
-        setCvList(list);
-      })
-      .catch(() => {})
-      .finally(() => setCvLoading(false));
-  }, []);
 
   // ── Upload inline CV ──────────────────────────────────────────────────────
   const handleUpload = async (file: File) => {
@@ -100,7 +96,8 @@ export default function InterviewSetupPage() {
       const data = await res.json();
       if (res.ok) {
         const newCv: CvItem = { ...data.cv, displayName: null, orderIndex: cvList.length };
-        setCvList((prev) => [...prev, newCv]);
+        // Optimistic update — không revalidate lại, giữ UI nhanh
+        await mutateCvList((prev) => [...(prev || []), newCv], { revalidate: false });
         setCvId(newCv.id);
         toast.success("Tải CV thành công!");
       } else {

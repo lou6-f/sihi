@@ -1,7 +1,9 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useCallback, useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
@@ -103,58 +105,36 @@ function StatTile({ icon: Icon, label, value, sub, iconColor, delay }: {
 // ─── Page ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [allInterviews, setAllInterviews] = useState<Interview[]>([]);
-  const [progress, setProgress] = useState<ProgressSnapshot | null>(null);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // ── SWR: interviews + progress (cached — return visits show data instantly) ──
+  const { data: intData, isLoading: intLoading } = useSWR<{ interviews: Interview[]; total: number }>(
+    "/api/interviews?limit=30",
+    fetcher
+  );
+  const { data: progData, isLoading: progLoading } = useSWR<{ latest: ProgressSnapshot | null }>(
+    "/api/analytics/progress",
+    fetcher
+  );
 
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [newsLoading, setNewsLoading] = useState(true);
-  const [newsRefreshing, setNewsRefreshing] = useState(false);
+  // ── SWR: news — tự động làm mới mỗi 30 phút (replaces manual setInterval) ──
   const [newsLastUpdated, setNewsLastUpdated] = useState<Date | null>(null);
-  const newsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 phút
-
-  const fetchNews = useCallback(async (silent = false) => {
-    if (silent) setNewsRefreshing(true);
-    try {
-      const res = await fetch("/api/news/recruitment");
-      const data = await res.json();
-      setNews(data.items || []);
-      setNewsLastUpdated(new Date());
-    } catch {
-      // giữ nguyên data cũ nếu lỗi
-    } finally {
-      setNewsLoading(false);
-      setNewsRefreshing(false);
+  const { data: newsData, isLoading: newsLoading, isValidating: newsRefreshing, mutate: mutateNews } = useSWR<{ items: NewsItem[] }>(
+    "/api/news/recruitment",
+    fetcher,
+    {
+      refreshInterval: 30 * 60 * 1000,
+      dedupingInterval: 5 * 60 * 1000,
+      onSuccess: () => setNewsLastUpdated(new Date()),
     }
-  }, []);
+  );
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/interviews?limit=30").then((r) => r.json()),
-      fetch("/api/analytics/progress").then((r) => r.json()),
-    ]).then(([intData, progData]) => {
-      const all: Interview[] = intData.interviews || [];
-      setAllInterviews(all);
-      setInterviews(all.slice(0, 5));
-      setTotal(intData.total ?? all.length);
-      setProgress(progData.latest || null);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+  const fetchNews = useCallback(() => { mutateNews(); }, [mutateNews]);
 
-    // Fetch lần đầu
-    fetchNews(false);
-
-    // Tự động cập nhật mỗi 30 phút (background, không reload trang)
-    newsIntervalRef.current = setInterval(() => fetchNews(true), REFRESH_INTERVAL_MS);
-
-    return () => {
-      if (newsIntervalRef.current) clearInterval(newsIntervalRef.current);
-    };
-  }, [fetchNews]);
+  const loading = intLoading || progLoading;
+  const allInterviews: Interview[] = intData?.interviews || [];
+  const interviews = allInterviews.slice(0, 5);
+  const total = intData?.total ?? allInterviews.length;
+  const progress: ProgressSnapshot | null = progData?.latest || null;
+  const news: NewsItem[] = newsData?.items || [];
 
   const streak = calcStreak(allInterviews);
   // avgScore = trung bình cộng đơn giản từ totalScore các buổi phỏng vấn đã có điểm
@@ -346,7 +326,7 @@ export default function DashboardPage() {
               </span>
             )}
             <button
-              onClick={() => fetchNews(true)}
+              onClick={() => fetchNews()}
               disabled={newsRefreshing}
               className="p-1 rounded hover:bg-zinc-800 transition-colors disabled:cursor-not-allowed"
               title="Cập nhật ngay"

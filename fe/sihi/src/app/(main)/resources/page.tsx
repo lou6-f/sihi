@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,28 +20,38 @@ const LEVEL_LABELS: Record<string, string> = { BEGINNER: "Cơ bản", INTERMEDIA
 const LEVEL_COLORS: Record<string, string> = { BEGINNER: "bg-green-500/20 text-green-400", INTERMEDIATE: "bg-yellow-500/20 text-yellow-400", ADVANCED: "bg-red-500/20 text-red-400" };
 
 export default function ResourcesPage() {
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [recommended, setRecommended] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [fieldFilter, setFieldFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set("q", search);
-    if (fieldFilter !== "all") params.set("field", fieldFilter);
-    if (levelFilter !== "all") params.set("level", levelFilter);
+  // Debounce search — tránh gọi API mỗi ký tự gõ (giảm từ N calls → 1 call/300ms)
+  const debouncedSearch = useDebounce(search, 300);
 
-    Promise.all([
-      fetch(`/api/resources?${params}`).then((r) => r.json()),
-      fetch("/api/resources/recommended").then((r) => r.json()).catch(() => []),
-    ]).then(([resData, recData]) => {
-      setResources(resData.resources || []);
-      setRecommended(Array.isArray(recData) ? recData : []);
-      setLoading(false);
-    });
-  }, [search, fieldFilter, levelFilter]);
+  // SWR: resources — key thay đổi khi filter thay đổi (sau debounce)
+  const params = new URLSearchParams();
+  if (debouncedSearch) params.set("q", debouncedSearch);
+  if (fieldFilter !== "all") params.set("field", fieldFilter);
+  if (levelFilter !== "all") params.set("level", levelFilter);
+
+  const { data: resData, isLoading } = useSWR<{ resources: Resource[] }>(
+    `/api/resources?${params}`,
+    fetcher
+  );
+
+  // SWR: recommended — key TĨNH, chỉ fetch 1 lần rồi cache
+  // Không phụ thuộc vào filter nên không re-fetch khi user thay đổi tìm kiếm
+  const { data: recData } = useSWR<Recommendation[]>(
+    "/api/resources/recommended",
+    async (url: string) => {
+      const res = await fetch(url);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+  );
+
+  const resources = resData?.resources || [];
+  const recommended = recData || [];
+  const loading = isLoading;
 
   return (
     <div className="space-y-5">

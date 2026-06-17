@@ -140,6 +140,7 @@ export default function AdminResourcesPage() {
   const [formData, setFormData] = useState<ResourceFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   // ─── AI Curator state ─────────────────────────────────────
   const [curating, setCurating] = useState(false);
@@ -336,12 +337,13 @@ export default function AdminResourcesPage() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    const ok = await confirm(`Bạn muốn xóa tài liệu “${title}”?`, {
+    const ok = await confirm(`Bạn muốn xóa tài liệu "${title}"?`, {
       title: "Xóa tài liệu",
       confirmLabel: "Xóa",
       danger: true,
     });
     if (!ok) return;
+    setDeletingIds((prev) => new Set(prev).add(id));
     try {
       const res = await fetch(`/api/admin/resources/${id}`, { method: "DELETE" });
       if (res.ok) {
@@ -352,6 +354,8 @@ export default function AdminResourcesPage() {
       }
     } catch {
       toast.error("Lỗi kết nối server");
+    } finally {
+      setDeletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
     }
   };
 
@@ -671,9 +675,15 @@ export default function AdminResourcesPage() {
                         >
                           <TableCell className="max-w-[250px] font-medium">
                             <div className="flex items-center gap-1.5">
-                              <span className="truncate" title={resource.title}>
+                              <a
+                                href={resource.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="truncate hover:text-violet-400 hover:underline underline-offset-2 transition-colors"
+                                title={resource.title}
+                              >
                                 {resource.title}
-                              </span>
+                              </a>
                               {resource.isAiGenerated && (
                                 <span title={`AI thu thập · Độ liên quan: ${resource.relevanceScore ?? "?"}/100`}>
                                   <Sparkles className="h-3 w-3 shrink-0 text-violet-400" />
@@ -764,8 +774,11 @@ export default function AdminResourcesPage() {
                                   handleDelete(resource.id, resource.title)
                                 }
                                 title="Xóa"
+                                disabled={deletingIds.has(resource.id)}
                               >
-                                <Trash2 className="h-4 w-4 text-red-400" />
+                                {deletingIds.has(resource.id)
+                                  ? <Loader2 className="h-4 w-4 animate-spin text-red-400" />
+                                  : <Trash2 className="h-4 w-4 text-red-400" />}
                               </Button>
                             </div>
                           </TableCell>

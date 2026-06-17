@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,19 +22,19 @@ const isInProgress = (s: string) => !isCompleted(s) && !isAbandoned(s);
 
 
 export default function HistoryPage() {
-  const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [fieldFilter, setFieldFilter] = useState("all");
 
-  useEffect(() => {
-    setLoading(true);
-    const query = new URLSearchParams({ page: String(page), limit: "10" });
-    fetch(`/api/interviews?${query}`)
-      .then((r) => r.json())
-      .then((data) => { setInterviews(data.interviews || []); setTotalPages(data.totalPages || 1); setLoading(false); });
-  }, [page]);
+  // SWR: cache by page — navigate về history show dữ liệu cached ngay lập tức
+  const query = new URLSearchParams({ page: String(page), limit: "10" });
+  const { data, isLoading: loading } = useSWR<{ interviews: Interview[]; totalPages: number }>(
+    `/api/interviews?${query}`,
+    fetcher
+  );
+
+  const interviews = data?.interviews || [];
+  const totalPages = data?.totalPages || 1;
+
 
   const filtered = fieldFilter === "all" ? interviews : interviews.filter((iv) => iv.field === fieldFilter);
 

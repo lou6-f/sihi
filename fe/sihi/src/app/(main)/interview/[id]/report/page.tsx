@@ -62,6 +62,8 @@ export default function ReportPage() {
   const [isGenerating, setIsGenerating] = useState(false); // true chỉ khi đang tạo báo cáo mới
   const [loadingStep, setLoadingStep] = useState(0);
   const [expandedStar, setExpandedStar] = useState<number | null>(null);
+  // resourceMatches[i] = danh sách tài liệu DB khớp với roadmap item thứ i
+  const [resourceMatches, setResourceMatches] = useState<Record<number, { title: string; url: string }[]>>({});
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   const REPORT_STEPS = [
@@ -70,6 +72,27 @@ export default function ReportPage() {
     { label: "Phân tích kỹ năng...",            detail: "Xác định điểm mạnh và cần cải thiện" },
     { label: "Tạo lộ trình học tập...",         detail: "Sắp có kết quả!" },
   ];
+
+  // Dùng AI để match từng topic trong roadmap với tài liệu phù hợp trong DB
+  useEffect(() => {
+    if (!report) return;
+    const roadmap = (report.learningRoadmap as RoadmapItem[]) || [];
+    if (roadmap.length === 0) return;
+
+    const topics = roadmap.map((r) => r.topic);
+    const field = (report.field as string) ?? "";
+
+    // 1 call duy nhất — Gemini phân tích semantic và chọn tài liệu phù hợp
+    fetch("/api/resources/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topics, field }),
+    })
+      .then((res) => res.ok ? res.json() : { matches: {} })
+      .then((data) => setResourceMatches(data.matches ?? {}))
+      .catch(() => {}); // lỗi mạng → fallback AI names tự động
+  }, [report]);
+
 
   useEffect(() => {
     let stepTimers: NodeJS.Timeout[] = [];
@@ -463,8 +486,27 @@ export default function ReportPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{r.topic}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">{r.reason}</p>
-                    {r.resources?.length > 0 && (
-                      <p className="text-xs text-violet-400 mt-1">📚 {r.resources.join(" · ")}</p>
+                    {/* Tài liệu DB khớp theo từ khóa topic */}
+                    {(resourceMatches[i]?.length > 0) && (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                        <span className="text-xs text-zinc-600">📚</span>
+                        {resourceMatches[i].map((res, ri) => (
+                          <a
+                            key={ri}
+                            href={res.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2 transition-colors inline-flex items-center gap-0.5"
+                          >
+                            {res.title}
+                            <span className="opacity-40 text-[10px]">↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {/* Fallback: gợi ý của AI nếu không tìm được tài liệu DB */}
+                    {!(resourceMatches[i]?.length > 0) && r.resources?.length > 0 && (
+                      <p className="text-xs text-zinc-500 mt-1.5">📚 {r.resources.join(" · ")}</p>
                     )}
                   </div>
                 </div>

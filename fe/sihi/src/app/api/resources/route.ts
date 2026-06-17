@@ -15,6 +15,7 @@ export async function GET(req: Request) {
   if (search) where.OR = [
     { title: { contains: search, mode: "insensitive" } },
     { description: { contains: search, mode: "insensitive" } },
+    { tags: { some: { tag: { contains: search, mode: "insensitive" } } } },
   ];
 
   const [resources, total] = await Promise.all([
